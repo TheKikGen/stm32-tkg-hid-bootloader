@@ -41,7 +41,7 @@ The TKG-FLASH has many new features, like dump, simulation mode, progression bar
 
 
 
-The TKG-FLASH tool can be considered a a new version of HID-FLASH 2.2.  The following features were added :
+The TKG-FLASH tool can be considered as a new version of HID-FLASH 2.2.  The following features were added :
 * Permanent flashing capability if com port passed in the command line
 * Waiting time parameter to wait HID device to be ready
 * Flashing simulation : same behaviour but not writes at all to the flash memory
