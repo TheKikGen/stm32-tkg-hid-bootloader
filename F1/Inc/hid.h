@@ -31,7 +31,7 @@
 #define IS_HIGH_DENSITY ( *(uint16_t *)0x1FFFF7E0 > 128 )
 
 /* Bootloader nb pages size in high density (2048 bytes)*/
-#define BOOTLOADER_PAGE_SIZE_H		2
+#define BOOTLOADER_PAGE_SIZE_H		1
 
 /* minimal SRAM size for the bootloader */
 #define SRAM_SIZE			(8 * 1024)

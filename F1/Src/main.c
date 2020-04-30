@@ -22,6 +22,10 @@
 * Modified January 2019
 *	by Michel Stempin <michel.stempin@wanadoo.fr>
 *	Cleanup and optimizations
+
+* Modified April 2020
+*	by TheKikgen Labs
+*	Runtime support of HD devices, various cleanup and optimizations, new state machine
 *
 */
 
@@ -131,14 +135,6 @@ void Reset_Handler(void)
 	WRITE_REG(SCB->VTOR, (volatile uint32_t) ram_vectors);
 	__DSB();
 
-
-	/* If:
-	 *  - no User Code is uploaded to the MCU or
-	 *  - MAGIC_WORD1 was stored in the battery-backed RAM registers
-	 *  - PB2 GPIO_IDR_IDR2 (BOOT 1 pin) is HIGH
-	 * then enter HID bootloader...
-	 */
-
 	/* Initialize GPIOs */
 	pins_init();
 
@@ -148,19 +144,25 @@ void Reset_Handler(void)
 	// Initial state
 	BootloaderState = BTL_WAITING;
 
-	// Activate USB HID and wait for an eventual START command
+	// Activate USB HID and wait for an eventual START command from CLI
 	USB_Init();
 	LED2_ON;
 	delay(18000000L);
 	LED2_OFF;
 
-	// Entering bootloader
+	// Entering bootloader if :
+	//
+	// no User Code is uploaded to the MCU or
+	// MAGIC_WORD1 was stored in the DR4 battery-backed RAM register or
+	// BOOT 1 jumper is set to HIGH. (PB2 / GPIO_IDR_IDR2) or
+	// TKG-FLASH CLI activated upload during the bootloader startup
 	if (	 ( ( (*(volatile uint32_t *) USER_PROGRAM ) & 0x2FFE0000 ) != SRAM_BASE )
 				 || get_and_clear_magic_word() == MAGIC_WORD1
 				 || READ_BIT(GPIOB->IDR, GPIO_IDR_IDR2)
 				 || BootloaderState == BTL_STARTED
 		 )
 	{
+			// Flashing loop. Flashing is done in the ISR.
 			do {
 					delay(400L);
 					if ( BootloaderState == BTL_WAITING ) {
@@ -176,14 +178,16 @@ void Reset_Handler(void)
 	USB_Shutdown();
 	// Start user code
 	LED2_ON;
+
 	/* Turn GPIO clocks off */
-		CLEAR_BIT(RCC->APB2ENR,
+	CLEAR_BIT(RCC->APB2ENR,
 			LED1_CLOCK | LED2_CLOCK | DISC_CLOCK/* | RCC_APB2ENR_IOPBEN*/);
 
 	// Go to user code
 	__DSB();
 	 WRITE_REG(SCB->VTOR, (volatile uint32_t)(USER_PROGRAM & 0xFFFF) );
 	__DSB();
+
 	 // Initialise master stack pointer.
 	 __asm__ volatile("msr msp, %0"::"g"
 				(*(volatile uint32_t *)USER_PROGRAM));
@@ -192,5 +196,4 @@ void Reset_Handler(void)
 	 (*(void (**)())(USER_PROGRAM + 4))();
 
 		// NEVER REACHED
-
 }
