@@ -177,7 +177,7 @@ copy_generic-pb12: $(BIN_DIR)
 	$(Q)$(CP) $(BUILD_DIR)/$(TARGET).bin $(BIN_DIR)/hid_generic_pb12.bin
 
 build_mini-stm32v3: TARGETFLAGS= -DTARGET_MINI_STM32V3
-build_mini-stm32v3: LINKER_SCRIPT=STM32F103CBT6.ld
+build_mini-stm32v3: LINKER_SCRIPT=STM32F103C8T6.ld
 build_mini-stm32v3: $(BUILD_DIR)/$(TARGET).elf $(BUILD_DIR)/$(TARGET).bin
 copy_mini-stm32v3: $(BIN_DIR)
 	$(ECHO) "COPY    $(BIN_DIR)/hid_mini-stm32v3.bin"
