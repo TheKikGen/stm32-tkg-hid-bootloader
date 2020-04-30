@@ -3,8 +3,8 @@
 This is a HID (Human Interface Device) driverless booloader for the STM32F10x family line, including the famous Bluepill.  It was largely inspired from https://github.com/Serasidis/STM32_HID_Bootloader from Vassilis Serasidis (respect to him !).  
 This project is not really a fork anymore due to a lot of enhancements, code optimizations and bug corrections.  
 
-The bootloder **supports transparently low-medium and high density devices without recompilation**. As the STM32_HID_Bootloader project, tkg-hid-bootloader doesn't use any ST libraries, but only CMSIS from the ST SDK. 
-The bootloader size is under 2 Kbytes, allowing more space for user programs (user flash memory starts at 0x08000800).
+The bootloder **supports transparently low-medium and high density devices without recompilation**. 
+As the STM32_HID_Bootloader project, tkg-hid-bootloader doesn't use any ST libraries, but only CMSIS from the ST SDK. So, the bootloader size is under 2 Kbytes, allowing more space for user programs (user flash memory starts at 0x08000800).
 
 The TKG-FLASH has many new features, like dump, simulation mode, progression bar, etc... and compatibilty with the STM32DUINO platform, and original HID-FLASH CLI is preserved.
 
