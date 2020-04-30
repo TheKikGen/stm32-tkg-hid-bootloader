@@ -8,6 +8,8 @@ As the STM32_HID_Bootloader project, tkg-hid-bootloader doesn't use any ST libra
 
 The TKG-FLASH has many new features, like dump, simulation mode, progression bar, etc... and compatibilty with the STM32DUINO platform, and original HID-FLASH CLI is preserved.
 
+Latest version of the GCC ARM toolchain is recommended for building the bootloader.
+
 # Entering the bootloader
 
 * Automatic when flashing with TKG-FLASH if the right com port is given to toggle DTR
@@ -39,15 +41,11 @@ The TKG-FLASH has many new features, like dump, simulation mode, progression bar
   tkg-flash myfirmare.bin -d=16 -s
 ``````
 
-
-
 The TKG-FLASH tool can be considered as a new version of HID-FLASH 2.2.  The following features were added :
 * Permanent flashing capability if com port passed in the command line
 * Waiting time parameter to wait HID device to be ready
 * Flashing simulation : same behaviour but not writes at all to the flash memory
 * Dump file feature
-
-Latest version of the GCC ARM toolchain is recommended for building the bootloader.
 
 # Adding a new upload method to the Arduino platform
 (todo)
