@@ -59,7 +59,7 @@ genericSTM32F103C.menu.upload_method.HIDUploadMethod2K.build.upload_flags=-DSERI
 genericSTM32F103C.menu.upload_method.HIDUploadMethod2K.build.vect=VECT_TAB_ADDR=0x8000800
 genericSTM32F103C.menu.upload_method.HIDUploadMethod2K.build.ldscript=ld/hid_bootloader_tkg_cb.ld
 ``````
-You must also edit the linker script file mentioned in the upload method (ex above is hid_bootloader_tkg_cb.ld) and adjust the ram and rom origin and lengths. Ram origin is the the one of your MCU (20K for the STM32103CB). Rom is the flash memory size minus the TKG bootloader size (2K). 
+You must also edit the linker script file mentioned in the upload method (ex above is hid_bootloader_tkg_cb.ld) and adjust the ram and rom origin and lengths. Ram origin start at 0x20000000 is the length is the one of your MCU (20K for the STM32103CB). Rom origin is 0x08000000 + TKG bootloader size (2K = 0x800).  The flash memory size is the MCU one minus the TKG bootloader size. 
 
 ``````
 MEMORY
