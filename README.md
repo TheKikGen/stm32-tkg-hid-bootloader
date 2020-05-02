@@ -1,6 +1,6 @@
 # STM32F10x TKG-HID-BOOTLOADER
 
-BETA VERSION !!!!
+BETA RC1 VERSION !!!!
 
 
 This is a HID (Human Interface Device) driverless booloader for the STM32F10x family line, including the famous Bluepill.  It was largely inspired from https://github.com/Serasidis/STM32_HID_Bootloader from Vassilis Serasidis (respect to him !).  
@@ -28,11 +28,7 @@ Latest version of the GCC ARM toolchain is recommended for building the bootload
 +-----------------------------------------------------------------------+
 |           TKG-Flash v2.2.1 STM32F103 HID Bootloader Flash Tool        |
 |                     High density device support.                      |
-+-----------------------------------------------------------------------+
 |   (c)      2020 - The KikGen Labs     https://github.com/TheKikGen    |
-|   (c)      2018 - Bruno Freitas       http://www.brunofreitas.com     |
-|   (c) 2018-2019 - Vassilis Serasidis  https://www.serasidis.gr        |
-|  Customized for STM32duino ecosystem  https://www.stm32duino.com      |
 +-----------------------------------------------------------------------+
 
   Usage: tkg-flash <firmware file name> [<options>]
@@ -51,7 +47,7 @@ Latest version of the GCC ARM toolchain is recommended for building the bootload
 The TKG-FLASH tool can be considered as a new version of HID-FLASH 2.2.  The following features were added :
 * Permanent flashing capability if com port passed in the command line
 * Waiting time parameter to wait HID device to be ready
-* Flashing simulation : same behaviour but not writes at all to the flash memory
+* Flashing simulation : same behaviour but no writes at all to the flash memory
 * Dump file feature
 
 # Adding a new upload method to the Arduino platform
@@ -82,3 +78,4 @@ REGION_ALIAS("REGION_RODATA", rom);
 /* Let common.inc handle the real work. */
 INCLUDE common.inc
 ``````
+Note that the "HID Booloader 2.0" (in the Arduino IDE existing upload methods) can be used to flash your firmware with TKG-HID-BOOTLOADER. Obviously, better to do that with the companion CLI tool TKG-FLASH...
