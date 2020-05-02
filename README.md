@@ -51,7 +51,7 @@ Latest version of the GCC ARM toolchain is recommended for building the bootload
 The TKG-FLASH tool can be considered as a new version of HID-FLASH 2.2.  The following features were added :
 * Permanent flashing capability if com port passed in the command line
 * Waiting time parameter to wait HID device to be ready
-* Flashing simulation : same behaviour but not writes at all to the flash memory
+* Flashing simulation : same behaviour but no writes at all to the flash memory
 * Dump file feature
 
 # Adding a new upload method to the Arduino platform
@@ -82,3 +82,4 @@ REGION_ALIAS("REGION_RODATA", rom);
 /* Let common.inc handle the real work. */
 INCLUDE common.inc
 ``````
+Note that the "HID Booloader 2.0" (in the Arduino IDE existing upload methods) can be used to flash your firmware with TKG-HID-BOOTLOADER. Obviously, better to do that with the companion CLI tool TKG-FLASH...
