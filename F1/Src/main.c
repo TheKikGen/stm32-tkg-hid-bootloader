@@ -59,7 +59,7 @@ __ __| |           |  /_) |     ___|             |           |
 #define INITIAL_MSP			0              // Initial stack pointer index
 #define RESET_HANDLER		1              // Reset handler index
 #define USB_LP_CAN1_RX0_IRQ_HANDLER	36 // USB Low-Priority and CAN1 RX0 IRQ handler index
-
+#define BACKUP_REG DR10
 // Minimal initial Flash-based vector table */
 uint32_t *VectorTable[] __attribute__((section(".isr_vector"))) = {
 	(uint32_t *) SRAM_END,     // Initial stack pointer (MSP) (see common.h)
@@ -131,11 +131,11 @@ void Reset_Handler(void)
 	SLEEP_U(1);
 	// GPIOs end ////////////////////////////////////////////////////////////////
 
-	// Get Magic word from DR4 if any ///////////////////////////////////////////
+	// Get Magic word from DR10 if any ///////////////////////////////////////////
 	// Enable the power and backup interface clocks by setting the
 	// PWREN and BKPEN bits in the RCC_APB1ENR register
 	SET_BIT(RCC->APB1ENR, RCC_APB1ENR_BKPEN | RCC_APB1ENR_PWREN);
-	bool magicHere = ( READ_REG(BKP->DR4) == MAGIC_WORD1 );
+	bool magicHere = ( READ_REG(BKP->BACKUP_REG) == MAGIC_WORD1 );
 	// Enable write access to the backup registers and the RTC.
 	SET_BIT(PWR->CR, PWR_CR_DBP);
 
@@ -160,8 +160,9 @@ void Reset_Handler(void)
 
 	// Waiting loop around 2s
 	if ( ! MustEnterBooloader ) {
-			// If reset occurs before the end of loop, enter bootloader
-			BKP->DR4 = MAGIC_WORD1;
+			// If reset occurs before the end of loop,
+			// that will activate bootloader mode at the next reset
+			BKP->BACKUP_REG = MAGIC_WORD1;
 			for (uint16_t i = 1 ; i<20 ; i++) {
 				LED1_ON;
 				SLEEP_M(100);
@@ -172,7 +173,7 @@ void Reset_Handler(void)
 
 	// Set DR4 backup register to zero
 	// Then reset backup registers and the RTC.
-	BKP->DR4 = 0x0000;
+	BKP->BACKUP_REG = 0x0000;
 	CLEAR_BIT(PWR->CR, PWR_CR_DBP);
 	CLEAR_BIT(RCC->APB1ENR, RCC_APB1ENR_BKPEN | RCC_APB1ENR_PWREN);
 
@@ -181,7 +182,7 @@ void Reset_Handler(void)
 
 	if (	MustEnterBooloader  ) {
 			USB_Shutdown();
-			SLEEP_S(3);
+			SLEEP_S(4);
 
 			// // Setup a temporary vector table into SRAM, so we can handle USB IRQs //////
 			volatile uint32_t *const ram_vectors =	(volatile uint32_t *const) SRAM_BASE;
@@ -202,7 +203,7 @@ void Reset_Handler(void)
 					}
 			}	while (BootloaderState != BTL_END ) ;
 			USB_Shutdown();
-			SLEEP_S(3);
+			SLEEP_S(4);
 			NVIC_SystemReset();
 	}
 
