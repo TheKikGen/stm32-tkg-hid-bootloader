@@ -1,6 +1,6 @@
 # STM32F10x TKG-HID-BOOTLOADER
 
-BETA VERSION !!!!
+BETA RC1 VERSION !!!!
 
 
 This is a HID (Human Interface Device) driverless booloader for the STM32F10x family line, including the famous Bluepill.  It was largely inspired from https://github.com/Serasidis/STM32_HID_Bootloader from Vassilis Serasidis (respect to him !).  
