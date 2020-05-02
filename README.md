@@ -4,7 +4,9 @@ BETA VERSION !!!!
 
 
 This is a HID (Human Interface Device) driverless booloader for the STM32F10x family line, including the famous Bluepill.  It was largely inspired from https://github.com/Serasidis/STM32_HID_Bootloader from Vassilis Serasidis (respect to him !).  
-This project is not really a fork anymore due to a lot of enhancements, code optimizations and bug corrections.  
+This project is not really a fork anymore due to a lot of enhancements, code optimizations and bug corrections.
+
+It was not possible (reasonable) to keep the size under the 2K, because before jumping to the user application, the bootloader must ensure that the current state of the MCU is clean. More, depending on your own hardware configuration, the size can vary with GPIO settings. So 4K is a good compromize between size and code quality, and will allow new features !
 
 The bootloder **supports transparently low-medium and high density devices without recompilation**. 
 As the STM32_HID_Bootloader project, tkg-hid-bootloader doesn't use any ST libraries, but only CMSIS from the ST SDK. So, the bootloader size is under 4 Kbytes, allowing more space for user programs (user flash memory starts at 0x08001000).
@@ -15,10 +17,11 @@ Latest version of the GCC ARM toolchain is recommended for building the bootload
 
 # Entering the bootloader
 
-* Automatic when flashing with TKG-FLASH if the right com port is given to toggle DTR
-* BOOT1 set to HIGH (permanent with jumper set)
+* "Double push" on the reset button
+* Automatic when flashing with TKG-FLASH if the right com port is given to toggle DTR (not always reliable)
+* BOOT1 set to HIGH (permanent with jumper set fro ultimate case !)
 * Writing the value **0x424C** in the DR4 backup register (ex : from you own firmware before rebooting) 
-* Double push on the reset button
+
 
 # TKG-FLASH
 ``````
