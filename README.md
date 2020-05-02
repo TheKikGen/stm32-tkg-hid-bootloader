@@ -28,11 +28,7 @@ Latest version of the GCC ARM toolchain is recommended for building the bootload
 +-----------------------------------------------------------------------+
 |           TKG-Flash v2.2.1 STM32F103 HID Bootloader Flash Tool        |
 |                     High density device support.                      |
-+-----------------------------------------------------------------------+
 |   (c)      2020 - The KikGen Labs     https://github.com/TheKikGen    |
-|   (c)      2018 - Bruno Freitas       http://www.brunofreitas.com     |
-|   (c) 2018-2019 - Vassilis Serasidis  https://www.serasidis.gr        |
-|  Customized for STM32duino ecosystem  https://www.stm32duino.com      |
 +-----------------------------------------------------------------------+
 
   Usage: tkg-flash <firmware file name> [<options>]
