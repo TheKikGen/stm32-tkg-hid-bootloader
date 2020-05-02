@@ -79,6 +79,9 @@ typedef enum {
   CMD_NOT_A_CMD = 0XFF
 } BTLCommand_t ;
 
+#define BAUD_RATE 115200
+#define PORT_MODE '8','N','1',0
+//serial.Serial(maple_path, baudrate=115200, xonxoff=1)
 
 // HID device handle
 hid_device *HidDeviceHandle = NULL;
@@ -212,36 +215,43 @@ static int UsbWrite(uint8_t *data, size_t sz) {
 ////////////////////////////////////////////////////////////////////////////////
 // Start serial port
 ////////////////////////////////////////////////////////////////////////////////
-int serial_init(char *serialPort) {
+boolean SerialToggleDTR(char *serialPort) {
+  const  char portMode[]={PORT_MODE};
 
-  printf("> Opening the [%s] serial port...\n",serialPort);
+  printf("> Toggling DTR on the [%s] serial port...\n",serialPort);
 
-  if( RS232_OpenComport(serialPort) ) {
-    Sleep_m(10);
-    RS232_CloseComport();
-    return(1);
-  }
+  int port = RS232_GetPortnr(serialPort);
+  if ( port < 0 ) return false;
 
-  printf("> Toggling DTR...\n");
+  if ( RS232_OpenComport(port, BAUD_RATE, portMode, 0) ) return false;
 
-  RS232_disableRTS();
-  RS232_enableDTR();
-  Sleep_m(200);
-  RS232_disableDTR();
-  Sleep_m(200);
-  RS232_enableDTR();
-  Sleep_m(200);
-  RS232_disableDTR();
-  Sleep_m(200);
-  RS232_send_magic();
-  Sleep_m(200);
-  RS232_CloseComport();
+  RS232_disableRTS(port);
+  Sleep_m(10);
 
-  // Wait for reset...
-  Sleep_m(250);
+  RS232_disableDTR(port);
+  Sleep_m(1);
 
-  return 0;
+  RS232_enableDTR(port);
+  Sleep_m(1);
+
+  RS232_disableDTR(port);
+
+  // Try magic number
+  RS232_enableRTS(port);
+  Sleep_m(1);
+  RS232_enableDTR(port);
+  Sleep_m(1);
+  RS232_disableDTR(port);
+  Sleep_m(1);
+  RS232_SendBuf(port, (unsigned char*)"1EAF", 4);
+  RS232_flushTX(port);
+  Sleep_m(100);
+
+  RS232_CloseComport(port);
+
+  return true;
 }
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // Look up for our bootloader in the USB devices
@@ -321,11 +331,7 @@ int main(int argc, char *argv[]) {
   printf("\n+-----------------------------------------------------------------------+\n");
   printf  ("|           TKG-Flash v2.2.1 STM32F103 HID Bootloader Flash Tool        |\n");
   printf  ("|                     High density device support.                      |\n");
-  printf  ("+-----------------------------------------------------------------------+\n");
-  printf  ("|   (c)      2020 - The KikGen Labs     https://github.com/TheKikGen    |\n");
-  printf  ("|   (c)      2018 - Bruno Freitas       http://www.brunofreitas.com     |\n");
-  printf  ("|   (c) 2018-2019 - Vassilis Serasidis  https://www.serasidis.gr        |\n");
-  printf  ("|  Customized for STM32duino ecosystem  https://www.stm32duino.com      |\n");
+  printf  ("|       (c) 2020 - The KikGen Labs     https://github.com/TheKikGen     |\n");
   printf  ("+-----------------------------------------------------------------------+\n\n");
 
   if(argc < 2) {
@@ -378,14 +384,12 @@ int main(int argc, char *argv[]) {
   rewind(FileHandle);
   printf("> Firmware file size is %ld bytes.\n",file_size);
 
-  //Setting up Serial port
-  if (serialPortId) {
-    if( serial_init(serialPortId) != 0 )
+  // Reset the boad by toggling DTR
+  if ( serialPortId ) {
+    if( !SerialToggleDTR(serialPortId) != 0 ) {
       printf("  ** Warning - Unable to open serial port [%s]\n",serialPortId);
+    }
   }
-
-  // Start and check Human Interface Device
-//  hid_init();
 
   int r = HIDDeviceLookUp();
   if ( r < 1 ) {
@@ -402,7 +406,7 @@ int main(int argc, char *argv[]) {
     goto exit;
   }
 
-  // Set HID read non blocking
+  // Set HID read  blocking
   hid_set_nonblocking(HidDeviceHandle, 0);
 
   // START BOOTLOADER
@@ -496,19 +500,19 @@ exit:
   if ( HidDeviceHandle ) hid_close(HidDeviceHandle);
   hid_exit();
 
-  // Reopen initial serial port.
-  if (serialPortId) {
-    int i = 0;
-    for(  ; i < 5 ; i ++) {
-      printf("> Searching for [%s] serial port...",serialPortId);
-      printf("%c\r",HourGlass());
-      if( RS232_OpenComport(serialPortId) == 0 ) break;
-      Sleep_s(1);
-    }
-    printf("\n");
-    if( i == 5) printf("  ** Warning - serial port %s was not found\n",serialPortId);
-    else printf("> Serial port [%s] found !\n",serialPortId );
-  }
+  // // Reopen initial serial port.
+  // if (serialPortId) {
+  //   int i = 0;
+  //   for(  ; i < 5 ; i ++) {
+  //     printf("> Searching for [%s] serial port...",serialPortId);
+  //     printf("%c\r",HourGlass());
+  //     if( SerialToggleDTR(serialPortId) == 0 ) break;
+  //     Sleep_s(1);
+  //   }
+  //   printf("\n");
+  //   if( i == 5) printf("  ** Warning - serial port %s was not found\n",serialPortId);
+  //   else printf("> Serial port [%s] found !\n",serialPortId );
+  //}
 
   printf("> End of firmware update.\n");
   return error;
