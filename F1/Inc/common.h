@@ -49,14 +49,67 @@ __ __| |           |  /_) |     ___|             |           |
 */
 
 
-#ifndef HID_H_
-#define HID_H_
+#ifndef COMMON_H_
+#define COMMON_H_
 
-/* Global Variables */
-extern volatile BootloaderState_t BootloaderState;
+// Memory addresses common for all the STM32F103 family
+
+/*!< FLASH base address in the alias region */
+#define FLASH_BASE_ADDR            ((uint32_t)0x08000000)
+
+/*!< SRAM base address in the alias region */
+#define SRAM_BASE_ADDR             ((uint32_t)0x20000000)
+
+/* Bootloader nb pages size in high density (2048 bytes)*/
+#define BOOTLOADER_PAGE_SIZE_H		2
+
+/* minimal SRAM size for the bootloader */
+#define SRAM_SIZE			(8 * 1024)
+
+/* SRAM end (bottom of stack) */
+#define SRAM_END			(SRAM_BASE_ADDR + SRAM_SIZE)
+
+// User code memory start address .
+#define USER_ADDR	(FLASH_BASE_ADDR + BOOTLOADER_PAGE_SIZE_H * 2048)
+
+// Magic word to enter the bootloader
+#define MAGIC_WORD1 0x424C
+
+// macro to check if user code present in flash memeory
+#define CHECK_USER_CODE(addr) ( ( (*(volatile uint32_t *) addr ) & 0x2FFE0000 ) != SRAM_BASE )
+
+/* macro to detect a high density device from the flash memory size */
+#define IS_HIGH_DENSITY ( *(uint16_t *)0x1FFFF7E0 > 128 )
+
+// uSec delay macro (not really accurate !)
+#define SLEEP_U(us) delay(7*us)
+
+// millis delay macro
+#define SLEEP_M(ms) delay(72*ms*100)
+
+// seonds delay macro
+#define SLEEP_S(s) delay(72*s*100000)
+
+// BTL Commands
+typedef enum {
+  CMD_START,
+  CMD_END,
+  CMD_ACK,
+  CMD_NOT_A_CMD = 0xFF
+} BTLCommand_t ;
+
+// Bootloader states
+typedef enum {
+  BTL_WAITING,
+  BTL_STARTED,
+  BTL_END
+} BootloaderState_t;
+
 
 /* Function Prototypes */
-void USB_EPHandler(uint16_t Status);
-void USB_Reset(void);
+void delay(uint32_t timeout);
 
-#endif /* HID_H_ */
+/* The bootloader entry point function prototype */
+void Reset_Handler(void);
+
+#endif /* COMMON_H_ */

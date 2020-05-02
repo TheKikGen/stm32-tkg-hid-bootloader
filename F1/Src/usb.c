@@ -24,7 +24,7 @@
 #include <stm32f10x.h>
 #include <stdlib.h>
 #include <stdbool.h>
-
+#include "common.h"
 #include "usb.h"
 #include "hid.h"
 
@@ -107,7 +107,7 @@ void USB_Init(void)
 	/* Reset RX and TX lengths inside RxTxBuffer struct for all
 	 * endpoints
 	 */
-	for (int i = 0; i < MAX_EP_NUM; i++) {
+	for (uint8_t i = 0; i < MAX_EP_NUM; i++) {
 		RxTxBuffer[i].RXL = RxTxBuffer[i].TXL = 0;
 	}
 

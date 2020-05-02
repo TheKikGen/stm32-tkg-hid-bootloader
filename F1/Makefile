@@ -8,7 +8,7 @@ VECTOR_TABLE_OFFSET = 0x0000
 # High Density STM32F103 devices have 2 kB Flash Page size
 PAGE_SIZE = 1024
 
-C_SRCS = Src/main.c Src/usb.c Src/hid.c Src/led.c Src/flash.c
+C_SRCS = Src/main.c Src/usb.c Src/hid.c Src/flash.c
 
 # Be silent per default, but 'make V=1' will show all compiler calls.
 # If you're insane, V=99 will print out all sorts of things.
@@ -37,7 +37,7 @@ CFLAGS += -D$(DEVICE)
 CFLAGS += -DVECTOR_TABLE_OFFSET=$(VECTOR_TABLE_OFFSET)
 CFLAGS += -nostdlib
 CFLAGS += $(TARGETFLAGS)
-CFLAGS += -DPAGE_SIZE=$(PAGE_SIZE)
+#CFLAGS += -DPAGE_SIZE=$(PAGE_SIZE)
 
 LDFLAGS += -Wl,-Map=$(BUILD_DIR)/$(TARGET).map,--cref
 LDFLAGS += -Wl,--gc-sections

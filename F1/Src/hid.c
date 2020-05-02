@@ -52,11 +52,10 @@ __ __| |           |  /_) |     ___|             |           |
 #include <string.h>
 #include <stdbool.h>
 #include "config.h"
+#include "common.h"
 #include "flash.h"
 #include "usb.h"
 #include "hid.h"
-#include "led.h"
-
 
 #define VID 0x09,0x12		         // idVendor 0x1209
 #define PID 0xBA,0xBE		         // idProduct 0xBEFA
