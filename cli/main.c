@@ -56,6 +56,10 @@ __ __| |           |  /_) |     ___|             |           |
 #include "rs232.h"
 #include "hidapi.h"
 
+
+// HID read timeout in milliseconds
+#define HID_READ_TIMEOUT 1000000
+
 /* Maximum packet size. Must be a multiple of 1024 (128 USB packets)  */
 #define HID_TX_SIZE    65
 #define HID_RX_SIZE     9
@@ -98,6 +102,37 @@ int serial_init(char *);
 ////////////////////////////////////////////////////////////////////////////////
 // Functions
 ////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////////////////////////////////
+// Sleep sec, millis, micro time funtions. Redefined due to random timing..;
+//------------------------------------------------------------------------------
+// Timing is key and notably used by the UsbWrite function.
+// When compiling under MinGW64/Windows, sleep and usleep are unstable...
+////////////////////////////////////////////////////////////////////////////////
+
+#ifdef WIN32
+
+void Sleep_u(unsigned long us) {
+
+    long long int  t1, t2, freq;
+    QueryPerformanceFrequency((LARGE_INTEGER*)&freq);
+    QueryPerformanceCounter((LARGE_INTEGER*)&t1);
+
+    do {
+        QueryPerformanceCounter((LARGE_INTEGER*)&t2);
+    } while( ( (t2 - t1)*1000000/freq ) < us );
+}
+
+void Sleep_m(unsigned long ms) { Sleep_u(ms*1000); }
+void Sleep_s(unsigned long s) { Sleep_u(s*1000000); }
+
+#else
+// Standard functions for Linux or other platforms
+void Sleep_m(unsigned long ms) { for (unsigned long t=0; t < ms ; t++) usleep(1000); }
+void Sleep_s(unsigned long s) { sleep(s); }
+void Sleep_u(unsigned long us) { usleep(us); }
+
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 // Clean DUMP of a buffer to screen
@@ -156,22 +191,24 @@ static void ShowHelp() {
 ////////////////////////////////////////////////////////////////////////////////
 // Write to usb with retries
 ////////////////////////////////////////////////////////////////////////////////
-static int usb_write(uint8_t *buffer, int len) {
-  int retries = 20;
-  int retval;
+static int UsbWrite(uint8_t *data, size_t sz) {
+  uint8_t retries = 20;
+  int r;
 
-  while(((retval = hid_write(HidDeviceHandle, buffer, len)) < len) && --retries) {
-    if(retval < 0) {
-      usleep(100 * 1000); // No data has been sent here. Delay and retry.
-    } else {
-      return 0; // Partial data has been sent. Firmware will be corrupted. Abort process.
+  do {
+    // All bytes were sent
+    if ( (r = hid_write(HidDeviceHandle, data, sz) ) == sz  ) return sz;
+    // USB Error
+    if ( r < 0 ) {
+      Sleep_m(100);
     }
-  }
-  if(retries <= 0) {
-    return 0;
-  }
-  return 1;
+    // No error but partial data sent. Abort
+    else break;
+  } while ( --retries );
+
+  return -1;
 }
+
 ////////////////////////////////////////////////////////////////////////////////
 // Start serial port
 ////////////////////////////////////////////////////////////////////////////////
@@ -180,7 +217,7 @@ int serial_init(char *serialPort) {
   printf("> Opening the [%s] serial port...\n",serialPort);
 
   if( RS232_OpenComport(serialPort) ) {
-    sleep(1);
+    Sleep_m(10);
     RS232_CloseComport();
     return(1);
   }
@@ -189,19 +226,19 @@ int serial_init(char *serialPort) {
 
   RS232_disableRTS();
   RS232_enableDTR();
-  usleep(200000L);
+  Sleep_m(200);
   RS232_disableDTR();
-  usleep(200000L);
+  Sleep_m(200);
   RS232_enableDTR();
-  usleep(200000L);
+  Sleep_m(200);
   RS232_disableDTR();
-  usleep(200000L);
+  Sleep_m(200);
   RS232_send_magic();
-  usleep(200000L);
+  Sleep_m(200);
   RS232_CloseComport();
 
   // Wait for reset...
-  usleep(250 * 1000);
+  Sleep_m(250);
 
   return 0;
 }
@@ -232,7 +269,7 @@ int HIDDeviceLookUp(void) {
     }
     hid_free_enumeration(deviceInfo);
     if ( r != -1 ) break;
-    sleep(1); // Wait 1 sec
+    Sleep_s(1);
   }
   printf("\n");
   return r;
@@ -248,20 +285,25 @@ static bool SendBTLCmd(BTLCommand_t cmd) {
   memcpy(&cmdBuff[1],CMD_SIGN,sizeof(CMD_SIGN));
 	cmdBuff[sizeof(CMD_SIGN)+1] = cmd;
 
-  if ( !usb_write(cmdBuff, HID_TX_SIZE ) )
-        return false;
+  if ( UsbWrite(cmdBuff, HID_TX_SIZE ) < 0 ) return false;
 
   return true;
 }
 ////////////////////////////////////////////////////////////////////////////////
 // Wait for a valid bootloader ACK command
 ////////////////////////////////////////////////////////////////////////////////
-static void WaitForACK(void) {
+static bool WaitForACK(void) {
   uint8_t cmdBuff[HID_RX_SIZE];
-  do {
-      hid_read(HidDeviceHandle,cmdBuff, HID_RX_SIZE) ;
-      usleep(500);
-  } while( cmdBuff[7] != CMD_ACK);
+
+  while ( hid_read_timeout(HidDeviceHandle,cmdBuff, HID_RX_SIZE,0) != HID_RX_SIZE
+            && cmdBuff[7] != CMD_ACK ) ;
+
+  return true;
+
+  // do {
+  //     hid_read(HidDeviceHandle,cmdBuff, HID_RX_SIZE) ;
+  //     Sleep_u(500);
+  // } while( cmdBuff[7] != CMD_ACK);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -342,30 +384,26 @@ int main(int argc, char *argv[]) {
       printf("  ** Warning - Unable to open serial port [%s]\n",serialPortId);
   }
 
+  // Start and check Human Interface Device
+//  hid_init();
 
-    // Start and check Human Interface Device
-  if ( !simulFlash ) {
-    hid_init();
+  int r = HIDDeviceLookUp();
+  if ( r < 1 ) {
+    if ( r == -2 ) printf("\n  ** Error - Incompatible HID bootloader version.\n");
+    else printf("  ** Error - [%04X:%04X] HID device was not found.\n",VID,PID);
+    error = 1;
+    goto exit;
+  }
+  printf("> [%04X:%04X] HID device found !\n",VID,PID);
 
-    int r = HIDDeviceLookUp();
-    if ( r < 1 ) {
-      if ( r == -2 ) printf("\n  ** Error - Incompatible HID bootloader version.\n");
-      else printf("  ** Error - [%04X:%04X] HID device was not found.\n",VID,PID);
-      error = 1;
-      goto exit;
-    }
-    printf("> [%04X:%04X] HID device found !\n",VID,PID);
-
-    //HidDeviceHandle = hid_open(VID, PID, NULL);
-    if (HidDeviceHandle == NULL) {
-      printf("  ** Error - Unable to open the [%04X:%04X] HID device.\n",VID,PID);
-      error = 1;
-      goto exit;
-    }
+  if (HidDeviceHandle == NULL) {
+    printf("  ** Error - Unable to open the [%04X:%04X] HID device.\n",VID,PID);
+    error = 1;
+    goto exit;
   }
 
-  // Set HID read blocking
-  //hid_set_nonblocking(HidDeviceHandle, 0);
+  // Set HID read non blocking
+  hid_set_nonblocking(HidDeviceHandle, 0);
 
   // START BOOTLOADER
 
@@ -382,11 +420,11 @@ int main(int argc, char *argv[]) {
   // Now the bootloader knows we are starting the firmware file transmission
 
   // Prepare the progression bar
+  uint8_t   bar ;
+  float progression = 0;
   if ( !dumpSector ) {
     printf("["); print_str_repeat('.',50); printf("]\r");
   }
-  uint8_t   bar ;
-  float progression = 0;
 
   // Prepare a first 1024 bytes bloc.
   uint32_t  bytesSent = 0;
@@ -403,15 +441,15 @@ int main(int argc, char *argv[]) {
         memcpy(&USB_Buffer[1], FileBlock1024 + i, HID_TX_SIZE - 1 );
 
         // Send data block to USB
-        if ( !usb_write(USB_Buffer, HID_TX_SIZE ) ) {
+        if ( UsbWrite(USB_Buffer, HID_TX_SIZE ) < 0 ) {
           printf("\n  ** Error while sending firmware data to the HID device.\n");
           error = 1;
           goto exit;
         }
-        usleep(500);
-      }
+      } else Sleep_m(2);
 
       bytesSent += ( HID_TX_SIZE - 1 );
+      Sleep_u(500);
 
       if ( ! dumpSector) {
         // Show the progress
@@ -422,15 +460,18 @@ int main(int argc, char *argv[]) {
       }
     }
 
-    // End of block. Wait for the bootloader ACK command.
-    if (!simulFlash) WaitForACK();
+    // End of block. Wait for the bootloader ACK command. 10s TIMOUT
+    if (!simulFlash && ! WaitForACK() ) {
+      printf("\n  ** Error or timeout while waiting ACK from the bootloader.\n");
+      error = 1;
+      goto exit;
+    }
 
     // Dump the sector
     if (dumpSector) {
       printf("\n");
       ShowBufferHexDump(bytesSent - 1024,FileBlock1024, 1024, dumpSector);
     }
-
 
     // Read next bytes
     memset(FileBlock1024, 0, 1024);
@@ -441,9 +482,9 @@ int main(int argc, char *argv[]) {
 
   // End of file. Send CMD_END to finish flashing and reboot the microcontroller...
   if (!simulFlash && !SendBTLCmd(CMD_END)  ) {
-    printf("  ** Error while sending bootloader END command.\n");
-    error = 1;
-    goto exit;
+    // printf("  ** Error while sending bootloader END command.\n");
+    // error = 1;
+    // goto exit;
   }
 
   printf("> Firmware flashing done ! %d sectors written",bytesSent/1024);
@@ -462,7 +503,7 @@ exit:
       printf("> Searching for [%s] serial port...",serialPortId);
       printf("%c\r",HourGlass());
       if( RS232_OpenComport(serialPortId) == 0 ) break;
-      sleep(1);
+      Sleep_s(1);
     }
     printf("\n");
     if( i == 5) printf("  ** Warning - serial port %s was not found\n",serialPortId);
