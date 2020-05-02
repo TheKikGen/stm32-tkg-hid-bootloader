@@ -1,10 +1,13 @@
 # STM32F10x TKG-HID-BOOTLOADER
 
+BETA VERSION !!!!
+
+
 This is a HID (Human Interface Device) driverless booloader for the STM32F10x family line, including the famous Bluepill.  It was largely inspired from https://github.com/Serasidis/STM32_HID_Bootloader from Vassilis Serasidis (respect to him !).  
 This project is not really a fork anymore due to a lot of enhancements, code optimizations and bug corrections.  
 
 The bootloder **supports transparently low-medium and high density devices without recompilation**. 
-As the STM32_HID_Bootloader project, tkg-hid-bootloader doesn't use any ST libraries, but only CMSIS from the ST SDK. So, the bootloader size is under 2 Kbytes, allowing more space for user programs (user flash memory starts at 0x08000800).
+As the STM32_HID_Bootloader project, tkg-hid-bootloader doesn't use any ST libraries, but only CMSIS from the ST SDK. So, the bootloader size is under 4 Kbytes, allowing more space for user programs (user flash memory starts at 0x08001000).
 
 The TKG-FLASH has many new features, like dump, simulation mode, progression bar, etc... and compatibilty with the STM32DUINO platform, and original HID-FLASH CLI is preserved.
 
@@ -15,6 +18,7 @@ Latest version of the GCC ARM toolchain is recommended for building the bootload
 * Automatic when flashing with TKG-FLASH if the right com port is given to toggle DTR
 * BOOT1 set to HIGH (permanent with jumper set)
 * Writing the value **0x424C** in the DR4 backup register (ex : from you own firmware before rebooting) 
+* Double push on the reset button
 
 # TKG-FLASH
 ``````
@@ -54,16 +58,16 @@ Exemple for an STM32103RCB
 genericSTM32F103C.menu.upload_method.HIDUploadMethod2K=TKG-HID bootloader
 genericSTM32F103C.menu.upload_method.HIDUploadMethod2K.upload.tool=tkg-hid
 genericSTM32F103C.menu.upload_method.HIDUploadMethod2K.build.upload_flags=-DSERIAL_USB -DGENERIC_BOOTLOADER
-genericSTM32F103C.menu.upload_method.HIDUploadMethod2K.build.vect=VECT_TAB_ADDR=0x8000800
+genericSTM32F103C.menu.upload_method.HIDUploadMethod2K.build.vect=VECT_TAB_ADDR=0x8001000
 genericSTM32F103C.menu.upload_method.HIDUploadMethod2K.build.ldscript=ld/hid_bootloader_tkg_cb.ld
 ``````
-You must also edit the linker script file mentioned in the upload method (ex above is hid_bootloader_tkg_cb.ld) and adjust the ram and rom origin and lengths. Ram origin start at 0x20000000 is the length is the one of your MCU (20K for the STM32103CB). Rom origin is 0x08000000 + TKG bootloader size (2K = 0x800).  The flash memory size is the MCU one minus the TKG bootloader size. 
+You must also edit the linker script file mentioned in the upload method (ex above is hid_bootloader_tkg_cb.ld) and adjust the ram and rom origin and lengths. Ram origin start at 0x20000000 is the length is the one of your MCU (20K for the STM32103CB). Rom origin is 0x08000000 + TKG bootloader size (4K = 0x1000).  The flash memory size is the MCU one minus the TKG bootloader size. 
 
 ``````
 MEMORY
 {
   ram (rwx) : ORIGIN = 0x20000000, LENGTH = 20K
-  rom (rx)  : ORIGIN = 0x08000800, LENGTH = 126K
+  rom (rx)  : ORIGIN = 0x08001000, LENGTH = 124K
 }
 
 /* Provide memory region aliases for common.inc */
