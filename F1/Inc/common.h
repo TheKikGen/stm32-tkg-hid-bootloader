@@ -78,8 +78,11 @@ __ __| |           |  /_) |     ___|             |           |
 // macro to check if user code present in flash memeory
 #define CHECK_USER_CODE(addr) ( ( (*(volatile uint32_t *) addr ) & 0x2FFE0000 ) != SRAM_BASE )
 
-/* macro to detect a high density device from the flash memory size */
-#define IS_HIGH_DENSITY ( *(uint16_t *)0x1FFFF7E0 > 128 )
+// macro to detect a high density device from the flash memory size
+#define IS_HIGH_DENSITY (*(uint16_t *)0x1FFFF7E0 > 128)
+
+// macro to validate a flash address
+#define IS_VALID_FLASH_ADDRESS(addr) (((addr) >= 0x08000000) && ((addr) < 0x0807FFFF))
 
 // uSec delay macro (not really accurate !)
 #define SLEEP_U(us) delay(7*us)
@@ -95,6 +98,8 @@ typedef enum {
   CMD_START,
   CMD_END,
   CMD_ACK,
+  CMD_INFO,
+  CMD_PAGE_OFFSET,
   CMD_NOT_A_CMD = 0xFF
 } BTLCommand_t ;
 
@@ -105,9 +110,11 @@ typedef enum {
   BTL_END
 } BootloaderState_t;
 
-
 /* Function Prototypes */
 void delay(uint32_t timeout);
+
+// Jump to user code 
+void BigJump(void);
 
 /* The bootloader entry point function prototype */
 void Reset_Handler(void);

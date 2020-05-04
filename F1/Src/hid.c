@@ -97,8 +97,14 @@ static uint8_t USB_Buffer[MAX_BUFFER_SIZE];
 /* Current page number (starts right after bootloader's end) */
 static volatile uint8_t CurrentPage;
 
+// First page of user code (after the bootloader)
+static volatile uint8_t FirstUserPage;
+
+// If a page offset is passed with the start command
+static volatile uint8_t PageOffset;
+
 /* Byte offset in flash page */
-static volatile uint16_t CurrentPageOffset;
+static volatile uint16_t CurrentPageBytesOffset;
 
 /* Bootloader CMD 0 padding */
 static volatile uint16_t CurrentPacketOffset;
@@ -176,28 +182,6 @@ static const uint8_t USB_ReportDescriptor[32] = {
 	0xC0 			// End Collection
 };
 
-// /* USB String Descriptors */
-// static const uint8_t USB_LangIDStringDescriptor[] = {
-// 	0x04,			// bLength
-// 	0x03,			// bDescriptorType (String)
-// 	0x09, 0x04		// English (United States)
-// };
-//
-// static const uint8_t USB_VendorStringDescriptor[] = {
-// 	0x22,			// bLength
-// 	0x03,			// bDescriptorType (String)
-// 	'w', 0, 'w', 0, 'w', 0, '.', 0, 's', 0, 'e', 0, 'r', 0, 'a', 0, 's', 0,
-// 	'i', 0, 'd', 0, 'i', 0, 's', 0, '.', 0, 'g', 0, 'r', 0
-// };
-//
-// static const uint8_t USB_ProductStringDescriptor[] = {
-// 	0x2C,			// bLength
-// 	0x03,			// bDescriptorType (String)
-// 	'S', 0, 'T', 0, 'M', 0, '3', 0, '2', 0, 'F', 0, ' ', 0, 'H', 0, 'I', 0,
-// 	'D', 0, ' ', 0, 'B', 0, 'o', 0, 'o', 0, 't', 0, 'l', 0, 'o', 0, 'a', 0,
-// 	'd', 0, 'e', 0, 'r', 0
-// };
-
 
 static void HIDUSB_GetDescriptor(USB_SetupPacket *setup_packet)
 {
@@ -220,28 +204,6 @@ static void HIDUSB_GetDescriptor(USB_SetupPacket *setup_packet)
 		length =  sizeof (USB_ReportDescriptor);
 		break;
 
-	// case USB_STR_DESC_TYPE:
-	// 	switch (setup_packet->wValue.L) {
-	// 	// case 0x00:
-	// 	// 	descriptor = (uint16_t *) USB_LangIDStringDescriptor;
-	// 	// 	length = sizeof (USB_LangIDStringDescriptor);
-	// 	// 	break;
-	// 	//
-	// 	// case 0x01:
-	// 	// 	descriptor = (uint16_t *) USB_VendorStringDescriptor;
-	// 	// 	length = sizeof (USB_VendorStringDescriptor);
-	// 	// 	break;
-	// 	//
-	// 	// case 0x02:
-	// 	// 	descriptor = (uint16_t *) USB_ProductStringDescriptor;
-	// 	// 	length = sizeof (USB_ProductStringDescriptor);
-	// 	// 	break;
-	//
-	// 	default:
-	// 		break;
-	// 	}
-	// 	break;
-
 	default:
 		break;
 	}
@@ -257,18 +219,16 @@ static BTLCommand_t HIDUSB_PacketIsCommand(void) {
 	for (i = 0; i < sizeof (CMD_SIGN)-1 ; i++) {
 		if (USB_Buffer[i] != CMD_SIGN[i]) return CMD_NOT_A_CMD;
  	}
-	uint8_t cmd = USB_Buffer[i++];
+	uint8_t cmd = USB_Buffer[i++]; // Save command Id
+	i+=MAX_PACKET_SIZE;            // Pass the eventual data packet
 	for ( ; i < MAX_BUFFER_SIZE ; i++) {
 		if ( USB_Buffer[i] ) return CMD_NOT_A_CMD;
 	}
 	return cmd;
 }
-
+////////////////////////////////////////////////////////////////////////////////
 // USB ISR !!!  DATA HANDLER
-// Bootloader states transition are :
-// BTL_WAITING -> BTL_STARTED -> BTL_RX -> BTL_END
-//                ^----1024 bytes-----<|
-
+////////////////////////////////////////////////////////////////////////////////
 // We receive a MAX_PACKET_SIZE data packet here
 static void HIDUSB_HandleData(uint8_t *data)
 {
@@ -281,31 +241,72 @@ static void HIDUSB_HandleData(uint8_t *data)
 	CurrentPacketOffset = 0;
 	uint8_t cmd  = HIDUSB_PacketIsCommand();
 
+	if ( BootloaderState == BTL_WAITING ) {
+		// Send some info about the MCU to the CLI
+		if ( cmd == CMD_INFO ) {
+				uint8_t commandData[MAX_PACKET_SIZE];
+				uint16_t p = PageSize;
+				uint32_t a = FLASH_BASE_ADDR + CurrentPage * PageSize ;
+				memcpy(commandData,&p,sizeof(p));
+				memcpy(commandData+sizeof(p), &a,sizeof(a) );
+				USB_SendData(ENDP1, (uint16_t *)commandData, sizeof(commandData));
+				return;
+		}
+
+		// It possible to pass a page offset to the CLI to change the flash address.
+		// Default address is 0x FLASH ADRESS +  0x1000  (2 HD pages/ 4 MD pages)
+		// For example, to Flash at FLASH ADRESS + 0x2000 (4 HD pages / 8 MD pages), you need so
+		// to add an offset of 2 HD pages or 4 MD pages. The bootloader will make
+		// a copy of the firmware first page at the usual flash address to allow the
+		// correct loading of vector table, whatever the offset is.
+		if ( cmd == CMD_PAGE_OFFSET ) {
+				uint8_t offset = USB_Buffer[MAX_PACKET_SIZE];
+				if ( offset != 0 ) {
+					uint32_t a = FLASH_BASE_ADDR + (CurrentPage + offset) * PageSize;
+					if (IS_VALID_FLASH_ADDRESS(a) ) {
+							PageOffset = offset;
+							CurrentPage += PageOffset;
+					}
+				}
+				return;
+		}
+	}
+
 	if ( cmd == CMD_START ) {
 			BootloaderState = BTL_STARTED;
 			return;
 	}
 
 	if ( cmd == CMD_END ) {
-		if (CurrentPageOffset) writePage = true;
+		if (CurrentPageBytesOffset) writePage = true;
 		BootloaderState = BTL_END;
 	}
 	else if (BootloaderState == BTL_STARTED) {
-		memcpy(PageData + CurrentPageOffset, USB_Buffer, MAX_BUFFER_SIZE);
-		CurrentPageOffset += MAX_BUFFER_SIZE;
-		if ( CurrentPageOffset % 1024 == 0) {
+		memcpy(PageData + CurrentPageBytesOffset, USB_Buffer, MAX_BUFFER_SIZE);
+		CurrentPageBytesOffset += MAX_BUFFER_SIZE;
+		if ( CurrentPageBytesOffset % 1024 == 0) {
 				USB_SendData(ENDP1, (uint16_t *) CMD_SIGN, sizeof (CMD_SIGN));
-				if (CurrentPageOffset == PageSize ) writePage = true;
+				if (CurrentPageBytesOffset == PageSize ) writePage = true;
 		}
 	}
 
 	// Write a page to the flash memory
 	if ( writePage ) {
 			LED1_ON;
+			// if an offset was required, copy the MSP and the vector table
+			// to the first user page
+			if ( PageOffset > 0 ) {
+				FLASH_WritePage((uint16_t *)(FLASH_BASE_ADDR + FirstUserPage * PageSize),
+				 				(uint16_t *) PageData, 8 / 2);
+				SLEEP_M(1);
+				PageOffset = 0;
+			}
+
+			// Flash the page at the requried address
 			FLASH_WritePage((uint16_t *)(FLASH_BASE_ADDR + CurrentPage * PageSize),
-			 				(uint16_t *) PageData, CurrentPageOffset / 2);
+			 				(uint16_t *) PageData, CurrentPageBytesOffset / 2);
 			CurrentPage++;
-			CurrentPageOffset = 0;
+			CurrentPageBytesOffset = 0;
 			writePage = false;
 			LED1_OFF;
 	}
@@ -316,17 +317,20 @@ static void HIDUSB_HandleData(uint8_t *data)
 void USB_Reset(void)
 {
 	BootloaderState     = BTL_WAITING ;
-	CurrentPacketOffset = 0;
-	CurrentPageOffset   = 0;
 
 	// Set values depending on device density
 	if ( IS_HIGH_DENSITY ) {
 		PageSize = 2048;
-		CurrentPage	= BOOTLOADER_PAGE_SIZE_H ;
+		FirstUserPage	= BOOTLOADER_PAGE_SIZE_H ;
 	} else {
 		PageSize = 1024;
-		CurrentPage = BOOTLOADER_PAGE_SIZE_H * 2 ;
+		FirstUserPage = BOOTLOADER_PAGE_SIZE_H * 2 ;
 	}
+
+	PageOffset = 0;
+	CurrentPacketOffset = 0;
+	CurrentPageBytesOffset   = 0;
+	CurrentPage = FirstUserPage;
 
 	/* Set buffer descriptor table offset in PMA memory */
 	WRITE_REG(*BTABLE, BTABLE_OFFSET);
