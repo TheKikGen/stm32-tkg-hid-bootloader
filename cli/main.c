@@ -76,6 +76,8 @@ typedef enum {
   CMD_START = 0,
   CMD_END = 1,
   CMD_ACK = 2,
+  CMD_INFO,
+  CMD_PAGE_OFFSET,
   CMD_NOT_A_CMD = 0XFF
 } BTLCommand_t ;
 
@@ -184,8 +186,10 @@ static void ShowHelp() {
   printf("  Usage: tkg-flash <firmware file name> [<options>]\n\n");
   printf("  Options are :\n");
   printf("  -d=16 -d=32   : hexa dump sectors by 16 or 32 bytes line length.\n");
+  printf("  -ide          : ide embedded, no progression bar, basic info.\n");
+  printf("  -o=<n>        : offset the default flash start page of 1-255 page(s)\n");
   printf("  -p=<com port> : serial com port used to toggle DTR for MCU reset.\n");
-  printf("  -s            : flashing simulation.\n");
+  printf("  -sim          : flashing simulation.\n");
   printf("  -w=<time s>   : HID device waiting time (10s default).\n");
   printf("\n  Examples :\n  tkg-flash myfirmare.bin -p=COM4 -w=30\n");
   printf("  tkg-flash myfirmare.bin -d=16 -s\n");
@@ -287,13 +291,14 @@ int HIDDeviceLookUp(void) {
 ////////////////////////////////////////////////////////////////////////////////
 // Send a bootloader command
 ////////////////////////////////////////////////////////////////////////////////
-static bool SendBTLCmd(BTLCommand_t cmd) {
+static bool SendBTLCmd(BTLCommand_t cmd, uint8_t cmdData) {
   uint8_t cmdBuff[HID_TX_SIZE];
   memset(cmdBuff, 0, HID_TX_SIZE);
 
   // Byte 0 is the Report USB HID ID. Copy from byte 1.
   memcpy(&cmdBuff[1],CMD_SIGN,sizeof(CMD_SIGN));
 	cmdBuff[sizeof(CMD_SIGN)+1] = cmd;
+  cmdBuff[sizeof(CMD_SIGN)+2] = cmdData;
 
   if ( UsbWrite(cmdBuff, HID_TX_SIZE ) < 0 ) return false;
 
@@ -325,6 +330,8 @@ int main(int argc, char *argv[]) {
   char *serialPortId = (char *) NULL;
   uint8_t dumpSector = 0;
   boolean simulFlash = false;
+  boolean ideEmb = false;
+  uint8_t PageOffset = 0;
 
   setbuf(stdout, NULL);
 
@@ -345,13 +352,16 @@ int main(int argc, char *argv[]) {
         serialPortId = argv[i] + 3;
       }
       else
-
       // USB waiting time
       if ( ( strncmp("-w=",argv[i],3) == 0 ) && ( strlen(argv[i]) >3 ) ) {
         USBTimeout = atol( argv[i] + 3);
       }
       else
-
+      // Page offset
+      if ( ( strncmp("-o=",argv[i],3) == 0 ) && ( strlen(argv[i]) >3 ) ) {
+        PageOffset = atoi( argv[i] + 3);
+      }
+      else
       // Dump 16
       if ( strncmp("-d=16",argv[i],5) == 0 ) dumpSector = 16;
       else
@@ -360,8 +370,12 @@ int main(int argc, char *argv[]) {
       if ( strncmp("-d=32",argv[i],5) == 0 ) dumpSector = 32;
       else
 
+      // IDE intrgation (ex Arduino)
+      if ( strncmp("-ide",argv[i],4) == 0 ) ideEmb = true;
+      else
+
       // Flash simulation
-      if ( strncmp("-s",argv[i],2) == 0 ) simulFlash = true;
+      if ( strncmp("-sim",argv[i],4) == 0 ) simulFlash = true;
 
       else  {
         printf("  ** Error - Unknow command line parameter.\n");
@@ -384,7 +398,7 @@ int main(int argc, char *argv[]) {
   rewind(FileHandle);
   printf("> Firmware file size is %ld bytes.\n",file_size);
 
-  // Reset the boad by toggling DTR
+  // Reset the board by toggling DTR
   if ( serialPortId ) {
     if( !SerialToggleDTR(serialPortId) != 0 ) {
       printf("  ** Warning - Unable to open serial port [%s]\n",serialPortId);
@@ -415,10 +429,18 @@ int main(int argc, char *argv[]) {
   if (simulFlash) printf(" (SIMULATION)");
   printf(" :\n");
 
-  if (!simulFlash &&  ! SendBTLCmd(CMD_START)  ) {
-    printf("  ** Error while sending bootloader START command.\n");
-    error = 1;
-    goto exit;
+  if (!simulFlash   ) {
+      if ( PageOffset && ! SendBTLCmd(CMD_PAGE_OFFSET,PageOffset)  ) {
+        printf("  ** Error while sending bootloader PAGE OFFSET command.\n");
+        error = 1;
+        goto exit;
+      }
+
+      if ( ! SendBTLCmd(CMD_START,PageOffset)  ) {
+        printf("  ** Error while sending bootloader START command.\n");
+        error = 1;
+        goto exit;
+      }
   }
 
   // Now the bootloader knows we are starting the firmware file transmission
@@ -426,17 +448,17 @@ int main(int argc, char *argv[]) {
   // Prepare the progression bar
   uint8_t   bar ;
   float progression = 0;
-  if ( !dumpSector ) {
+  if ( !dumpSector && !ideEmb) {
     printf("["); print_str_repeat('.',50); printf("]\r");
   }
 
-  // Prepare a first 1024 bytes bloc.
+  // Prepare a first 1024 bytes block.
   uint32_t  bytesSent = 0;
   memset(FileBlock1024, 0, 1024);
   size_t    bytesRead = fread(FileBlock1024, 1, 1024, FileHandle);
 
   while( bytesRead > 0 ) {
-    // Send a 1024 bytes bloc (even if eof).
+    // Send a 1024 bytes block (even if eof).
     // Value are voluntarly hard coded
     for( uint16_t i = 0; i < 1024 ; i += (HID_TX_SIZE-1) ) {
 
@@ -455,7 +477,7 @@ int main(int argc, char *argv[]) {
       bytesSent += ( HID_TX_SIZE - 1 );
       Sleep_u(500);
 
-      if ( ! dumpSector) {
+      if ( !dumpSector && !ideEmb) {
         // Show the progress
         progression = (float)bytesSent / (float)file_size * 50.0;
         bar = progression ; if (bar > 50) bar = 50;
@@ -463,6 +485,8 @@ int main(int argc, char *argv[]) {
         printf("  %6d bytes\r",bytesSent);
       }
     }
+
+    if ( ideEmb ) printf("+");
 
     // End of block. Wait for the bootloader ACK command. 10s TIMOUT
     if (!simulFlash && ! WaitForACK() ) {
@@ -485,35 +509,20 @@ int main(int argc, char *argv[]) {
   printf("\n");
 
   // End of file. Send CMD_END to finish flashing and reboot the microcontroller...
-  if (!simulFlash && !SendBTLCmd(CMD_END)  ) {
+  if (!simulFlash && !SendBTLCmd(CMD_END,0)  ) {
     // printf("  ** Error while sending bootloader END command.\n");
     // error = 1;
     // goto exit;
   }
-
   printf("> Firmware flashing done ! %d sectors written",bytesSent/1024);
   if (simulFlash) printf(" (SIMULATION)");
   printf(".\n");
+  if ( ideEmb ) printf("> %d bytes written.\n",bytesSent);
 
 exit:
   if ( FileHandle ) fclose( FileHandle );
   if ( HidDeviceHandle ) hid_close(HidDeviceHandle);
   hid_exit();
-
-  // // Reopen initial serial port.
-  // if (serialPortId) {
-  //   int i = 0;
-  //   for(  ; i < 5 ; i ++) {
-  //     printf("> Searching for [%s] serial port...",serialPortId);
-  //     printf("%c\r",HourGlass());
-  //     if( SerialToggleDTR(serialPortId) == 0 ) break;
-  //     Sleep_s(1);
-  //   }
-  //   printf("\n");
-  //   if( i == 5) printf("  ** Warning - serial port %s was not found\n",serialPortId);
-  //   else printf("> Serial port [%s] found !\n",serialPortId );
-  //}
-
   printf("> End of firmware update.\n");
   return error;
 }
