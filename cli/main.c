@@ -60,6 +60,9 @@ __ __| |           |  /_) |     ___|             |           |
 // HID read timeout in milliseconds
 #define HID_READ_TIMEOUT 1000000
 
+// Serial port RETRY
+#define SERIAL_PORT_RETRY 5
+
 /* Maximum packet size. Must be a multiple of 1024 (128 USB packets)  */
 #define HID_TX_SIZE    65
 #define HID_RX_SIZE     9
@@ -73,12 +76,13 @@ static const uint8_t CMD_SIGN[] = {'B','T','L','D','C','M','D'};
 
 // BTL Commands
 typedef enum {
-  CMD_START = 0,
-  CMD_END = 1,
-  CMD_ACK = 2,
-  CMD_INFO,
-  CMD_PAGE_OFFSET,
-  CMD_NOT_A_CMD = 0XFF
+  CMD_START       = 0,
+  CMD_END         = 1,
+  CMD_ACK         = 2,
+  CMD_INFO        = 3,
+  CMD_PAGE_OFFSET = 4,
+  CMD_SIMUL       = 5,
+  CMD_NOT_A_CMD   = 0XFF
 } BTLCommand_t ;
 
 #define BAUD_RATE 115200
@@ -187,6 +191,7 @@ static void ShowHelp() {
   printf("  Options are :\n");
   printf("  -d=16 -d=32   : hexa dump sectors by 16 or 32 bytes line length.\n");
   printf("  -ide          : ide embedded, no progression bar, basic info.\n");
+  printf("  -info         : get some information from the MCU to be flashed.\n");
   printf("  -o=<n>        : offset the default flash start page of 1-255 page(s)\n");
   printf("  -p=<com port> : serial com port used to toggle DTR for MCU reset.\n");
   printf("  -sim          : flashing simulation.\n");
@@ -222,38 +227,50 @@ static int UsbWrite(uint8_t *data, size_t sz) {
 boolean SerialToggleDTR(char *serialPort) {
   const  char portMode[]={PORT_MODE};
 
-  printf("> Toggling DTR on the [%s] serial port...\n",serialPort);
+  uint8_t nbTry = SERIAL_PORT_RETRY;
 
   int port = RS232_GetPortnr(serialPort);
   if ( port < 0 ) return false;
 
-  if ( RS232_OpenComport(port, BAUD_RATE, portMode, 0) ) return false;
 
-  RS232_disableRTS(port);
-  Sleep_m(10);
+  do {
+    printf("> Toggling DTR on the [%s] serial port...(%d attempt(s) left)\n",serialPort,nbTry);
+    if ( RS232_OpenComport(port, BAUD_RATE, portMode, 0) == 0 ) {
+      Sleep_s(1);
+      RS232_disableRTS(port);
+      Sleep_m(10);
 
-  RS232_disableDTR(port);
-  Sleep_m(1);
+      RS232_disableDTR(port);
+      Sleep_m(1);
 
-  RS232_enableDTR(port);
-  Sleep_m(1);
+      RS232_enableDTR(port);
+      Sleep_m(1);
 
-  RS232_disableDTR(port);
+      RS232_disableDTR(port);
 
-  // Try magic number
-  RS232_enableRTS(port);
-  Sleep_m(1);
-  RS232_enableDTR(port);
-  Sleep_m(1);
-  RS232_disableDTR(port);
-  Sleep_m(1);
-  RS232_SendBuf(port, (unsigned char*)"1EAF", 4);
-  RS232_flushTX(port);
-  Sleep_m(100);
+      // Try magic number
+      RS232_enableRTS(port);
+      Sleep_m(1);
+      RS232_enableDTR(port);
+      Sleep_m(1);
+      RS232_disableDTR(port);
+      Sleep_m(1);
+      RS232_SendBuf(port, (unsigned char*)"1EAF", 4);
+      Sleep_m(10);
+      RS232_flushTX(port);
+      RS232_SendBuf(port, (unsigned char*)"1EAF", 4);
+      Sleep_m(10);
+      RS232_flushTX(port);
+      Sleep_m(100);
 
-  RS232_CloseComport(port);
+      RS232_CloseComport(port);
 
-  return true;
+      return true;
+    }
+    Sleep_s(1);
+  } while ( --nbTry );
+
+  return false;
 }
 
 
@@ -263,12 +280,14 @@ boolean SerialToggleDTR(char *serialPort) {
 // Return 1 if Found, -1: if Not found, -2: if version error
 // If no error, the device is opened with HidDeviceHandle
 ////////////////////////////////////////////////////////////////////////////////
-int HIDDeviceLookUp(void) {
+int HIDDeviceLookUp(boolean loop) {
   struct hid_device_info *deviceInfo, *nextDevInfo;
   int r = -1;
 
+  uint8_t nbTry = loop ? USBTimeout : 1 ;
+
   // N try, more or less N sec to open the right HID device.
-  for( uint8_t i = 0; i < USBTimeout ; i++ ) {
+  for( uint8_t i = 0; i < nbTry ; i++ ) {
     printf("> Searching for [%04X:%04X] HID device...",VID,PID);
     printf("%c\r",HourGlass());
 
@@ -311,7 +330,7 @@ static bool WaitForACK(void) {
   uint8_t cmdBuff[HID_RX_SIZE];
 
   while ( hid_read_timeout(HidDeviceHandle,cmdBuff, HID_RX_SIZE,0) != HID_RX_SIZE
-            && cmdBuff[7] != CMD_ACK ) ;
+            && cmdBuff[7] != CMD_ACK )  Sleep_m(2);
 
   return true;
 
@@ -322,6 +341,22 @@ static bool WaitForACK(void) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// Wait for a valid bootloader info block command
+////////////////////////////////////////////////////////////////////////////////
+static bool WaitForInfoBlock(uint8_t *infoBlock) {
+
+  if ( ! SendBTLCmd(CMD_INFO,0)) return false ;
+  while ( hid_read_timeout(HidDeviceHandle,infoBlock, HID_RX_SIZE,0) != HID_RX_SIZE
+            && infoBlock[7] != CMD_INFO ) {
+
+              Sleep_m(100) ;
+              if ( ! SendBTLCmd(CMD_INFO,0)) return false ;
+  }
+
+  return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // MAIN
 ////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char *argv[]) {
@@ -329,6 +364,7 @@ int main(int argc, char *argv[]) {
   int       error    = 0;
   char *serialPortId = (char *) NULL;
   uint8_t dumpSector = 0;
+  boolean infoMCU = false;
   boolean simulFlash = false;
   boolean ideEmb = false;
   uint8_t PageOffset = 0;
@@ -336,7 +372,7 @@ int main(int argc, char *argv[]) {
   setbuf(stdout, NULL);
 
   printf("\n+-----------------------------------------------------------------------+\n");
-  printf  ("|           TKG-Flash v2.2.1 STM32F103 HID Bootloader Flash Tool        |\n");
+  printf  ("|            TKG-Flash v2.3 STM32F103 HID Bootloader Flash Tool         |\n");
   printf  ("|                     High density device support.                      |\n");
   printf  ("|       (c) 2020 - The KikGen Labs     https://github.com/TheKikGen     |\n");
   printf  ("+-----------------------------------------------------------------------+\n\n");
@@ -370,6 +406,11 @@ int main(int argc, char *argv[]) {
       if ( strncmp("-d=32",argv[i],5) == 0 ) dumpSector = 32;
       else
 
+      // MCU Info
+      if ( strncmp("-info",argv[i],5) == 0 ) infoMCU = true;
+      else
+
+
       // IDE intrgation (ex Arduino)
       if ( strncmp("-ide",argv[i],4) == 0 ) ideEmb = true;
       else
@@ -398,22 +439,26 @@ int main(int argc, char *argv[]) {
   rewind(FileHandle);
   printf("> Firmware file size is %ld bytes.\n",file_size);
 
-  // Reset the board by toggling DTR
-  if ( serialPortId ) {
-    if( !SerialToggleDTR(serialPortId) != 0 ) {
-      printf("  ** Warning - Unable to open serial port [%s]\n",serialPortId);
+  // Check first HID presence to avoid tries loop if already here
+  int r = HIDDeviceLookUp(false);
+  if ( r < 1 ) {
+    // Reset the board by toggling DTR
+    if ( serialPortId ) {
+      if( !SerialToggleDTR(serialPortId) != 0 ) {
+        printf("  ** Warning - Unable to open serial port [%s]\n",serialPortId);
+      }
+    }
+
+    r = HIDDeviceLookUp(true);
+    if ( r < 1 ) {
+      if ( r == -2 ) printf("\n  ** Error - Incompatible HID bootloader version.\n");
+      else printf("  ** Error - [%04X:%04X] HID device was not found.\n",VID,PID);
+      error = 1;
+      goto exit;
     }
   }
 
-  int r = HIDDeviceLookUp();
-  if ( r < 1 ) {
-    if ( r == -2 ) printf("\n  ** Error - Incompatible HID bootloader version.\n");
-    else printf("  ** Error - [%04X:%04X] HID device was not found.\n",VID,PID);
-    error = 1;
-    goto exit;
-  }
   printf("> [%04X:%04X] HID device found !\n",VID,PID);
-
   if (HidDeviceHandle == NULL) {
     printf("  ** Error - Unable to open the [%04X:%04X] HID device.\n",VID,PID);
     error = 1;
@@ -421,26 +466,60 @@ int main(int argc, char *argv[]) {
   }
 
   // Set HID read  blocking
-  hid_set_nonblocking(HidDeviceHandle, 0);
+  //hid_set_nonblocking(HidDeviceHandle, 0);
 
   // START BOOTLOADER
 
   printf("> Flashing firmware");
   if (simulFlash) printf(" (SIMULATION)");
+  if (infoMCU) printf(" (INFO)");
   printf(" :\n");
 
-  if (!simulFlash   ) {
-      if ( PageOffset && ! SendBTLCmd(CMD_PAGE_OFFSET,PageOffset)  ) {
-        printf("  ** Error while sending bootloader PAGE OFFSET command.\n");
-        error = 1;
-        goto exit;
-      }
+  // Pages offset
+  if ( PageOffset && ! SendBTLCmd(CMD_PAGE_OFFSET,PageOffset)  ) {
+    printf("  ** Error while sending bootloader PAGE OFFSET command.\n");
+    error = 1;
+    goto exit;
+  }
 
-      if ( ! SendBTLCmd(CMD_START,PageOffset)  ) {
-        printf("  ** Error while sending bootloader START command.\n");
+  // Send IMUL command if simulation mode
+  if (simulFlash) {
+    if ( ! SendBTLCmd(CMD_SIMUL,0)  ) {
+      printf("  ** Error while sending bootloader SIMUL command.\n");
+      error = 1;
+      goto exit;
+    }
+    // Wait for an ACK because we want to secure the simulation mode
+    if (! WaitForACK() ) {
+      printf("\n  ** Error or timeout while waiting ACK from the bootloader.\n");
+      error = 1;
+      goto exit;
+    }
+  }
+
+  // Get MCU informations
+  if (infoMCU) {
+    uint8_t infoBlock[HID_RX_SIZE];
+    // Wait for info block
+    if ( ! WaitForInfoBlock(infoBlock) ) {
+        printf("\n  ** Error or timeout while waiting info block from the bootloader.\n");
         error = 1;
         goto exit;
-      }
+    } else {
+        uint16_t m = *(uint16_t *)infoBlock;
+        uint32_t a = *(uint32_t *)(infoBlock + sizeof(uint16_t));
+        printf("  INFO - Informations reported by the MCU :\n");
+        printf("      Flash memory size  : %d K (%s density device)\n",m,
+                       (m <= 128 ? "medium":"high") );
+        printf("      Page size          : %d bytes\n", (m <= 128 ? 1024:2048) );
+        printf("      Flash base address : 0x%04X\n",a);
+    }
+  }
+
+  if ( ! SendBTLCmd(CMD_START,0)  ) {
+    printf("  ** Error while sending bootloader START command.\n");
+    error = 1;
+    goto exit;
   }
 
   // Now the bootloader knows we are starting the firmware file transmission
@@ -448,9 +527,12 @@ int main(int argc, char *argv[]) {
   // Prepare the progression bar
   uint8_t   bar ;
   float progression = 0;
+  printf("\n");
   if ( !dumpSector && !ideEmb) {
-    printf("["); print_str_repeat('.',50); printf("]\r");
+    printf("  ["); print_str_repeat('.',50); printf("]\r");
   }
+  char wfChar ;
+  if (simulFlash) wfChar ='-'; else wfChar = '+';
 
   // Prepare a first 1024 bytes block.
   uint32_t  bytesSent = 0;
@@ -462,17 +544,15 @@ int main(int argc, char *argv[]) {
     // Value are voluntarly hard coded
     for( uint16_t i = 0; i < 1024 ; i += (HID_TX_SIZE-1) ) {
 
-      if ( !simulFlash ) {
-        uint8_t USB_Buffer[HID_TX_SIZE];
-        memcpy(&USB_Buffer[1], FileBlock1024 + i, HID_TX_SIZE - 1 );
+      uint8_t USB_Buffer[HID_TX_SIZE];
+      memcpy(&USB_Buffer[1], FileBlock1024 + i, HID_TX_SIZE - 1 );
 
-        // Send data block to USB
-        if ( UsbWrite(USB_Buffer, HID_TX_SIZE ) < 0 ) {
-          printf("\n  ** Error while sending firmware data to the HID device.\n");
-          error = 1;
-          goto exit;
-        }
-      } else Sleep_m(2);
+      // Send data block to USB
+      if ( UsbWrite(USB_Buffer, HID_TX_SIZE ) < 0 ) {
+        printf("\n  ** Error while sending firmware data to the HID device.\n");
+        error = 1;
+        goto exit;
+      }
 
       bytesSent += ( HID_TX_SIZE - 1 );
       Sleep_u(500);
@@ -481,15 +561,15 @@ int main(int argc, char *argv[]) {
         // Show the progress
         progression = (float)bytesSent / (float)file_size * 50.0;
         bar = progression ; if (bar > 50) bar = 50;
-        printf("["); print_str_repeat('+',bar); print_str_repeat('.',50 - bar); printf("]");
-        printf("  %6d bytes\r",bytesSent);
+        printf("  ["); print_str_repeat(wfChar,bar); print_str_repeat('.',50 - bar); printf("]");
+        printf("  %6d bytes sent.\r",bytesSent);
       }
     }
 
-    if ( ideEmb ) printf("+");
+    if ( ideEmb ) printf(&wfChar);
 
     // End of block. Wait for the bootloader ACK command. 10s TIMOUT
-    if (!simulFlash && ! WaitForACK() ) {
+    if ( ! WaitForACK() ) {
       printf("\n  ** Error or timeout while waiting ACK from the bootloader.\n");
       error = 1;
       goto exit;
@@ -509,15 +589,16 @@ int main(int argc, char *argv[]) {
   printf("\n");
 
   // End of file. Send CMD_END to finish flashing and reboot the microcontroller...
-  if (!simulFlash && !SendBTLCmd(CMD_END,0)  ) {
+  if (!SendBTLCmd(CMD_END,0)  ) {
     // printf("  ** Error while sending bootloader END command.\n");
     // error = 1;
     // goto exit;
   }
-  printf("> Firmware flashing done ! %d sectors written",bytesSent/1024);
+  printf("\n> Firmware flashing done !\n");
+  printf("  %d sectors written",bytesSent/1024);
   if (simulFlash) printf(" (SIMULATION)");
   printf(".\n");
-  if ( ideEmb ) printf("> %d bytes written.\n",bytesSent);
+  if (ideEmb) printf("  %d bytes sent.\n",bytesSent);
 
 exit:
   if ( FileHandle ) fclose( FileHandle );
