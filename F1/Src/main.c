@@ -73,6 +73,50 @@ void delay(uint32_t t) {
 	for (uint32_t i = 0; i < t; i++) 	__NOP();
 }
 
+static void MCU_Init(void)
+{
+  /* Reset the RCC clock configuration to the default reset state(for debug purpose) */
+  /* Set HSION bit */
+  RCC->CR |= (uint32_t)0x00000001;
+
+  /* Reset SW, HPRE, PPRE1, PPRE2, ADCPRE and MCO bits */
+#ifndef STM32F10X_CL
+  RCC->CFGR &= (uint32_t)0xF8FF0000;
+#else
+  RCC->CFGR &= (uint32_t)0xF0FF0000;
+#endif /* STM32F10X_CL */
+
+  /* Reset HSEON, CSSON and PLLON bits */
+  RCC->CR &= (uint32_t)0xFEF6FFFF;
+
+  /* Reset HSEBYP bit */
+  RCC->CR &= (uint32_t)0xFFFBFFFF;
+
+  /* Reset PLLSRC, PLLXTPRE, PLLMUL and USBPRE/OTGFSPRE bits */
+  RCC->CFGR &= (uint32_t)0xFF80FFFF;
+
+#ifdef STM32F10X_CL
+  /* Reset PLL2ON and PLL3ON bits */
+  RCC->CR &= (uint32_t)0xEBFFFFFF;
+
+  /* Disable all interrupts and clear pending bits  */
+  RCC->CIR = 0x00FF0000;
+
+  /* Reset CFGR2 register */
+  RCC->CFGR2 = 0x00000000;
+#elif defined (STM32F10X_LD_VL) || defined (STM32F10X_MD_VL) || (defined STM32F10X_HD_VL)
+  /* Disable all interrupts and clear pending bits  */
+  RCC->CIR = 0x009F0000;
+
+  /* Reset CFGR2 register */
+  RCC->CFGR2 = 0x00000000;
+#else
+  /* Disable all interrupts and clear pending bits  */
+  RCC->CIR = 0x009F0000;
+#endif /* STM32F10X_CL */
+
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // Jump to user code
 //-----------------------------------------------------------------------------
@@ -98,6 +142,10 @@ void BigJump(void) {
 ///////////////////////////////////////////////////////////////////////////////
 void Reset_Handler(void)
 {
+
+	// Return to initial reset state
+	MCU_Init();
+
 	// Set sysclock to 72MHZ ////////////////////////////////////////////////////
 	// Enable HSE and wait until HSE is ready
 	SET_BIT(RCC->CR, RCC_CR_HSEON);
@@ -123,11 +171,19 @@ void Reset_Handler(void)
 
 	// Initialize GPIOs /////////////////////////////////////////////////////////
 	SET_BIT(RCC->APB2ENR, LED1_CLOCK | LED2_CLOCK | DISC_CLOCK | RCC_APB2ENR_IOPBEN);
-	LED1_BIT_0;	LED1_BIT_1; LED1_MODE;   LED2_BIT_0; LED2_BIT_1; LED2_MODE;
+	LED1_BIT_0;	LED1_BIT_1; LED1_MODE;
+	LED2_BIT_0; LED2_BIT_1; LED2_MODE;
 	DISC_BIT_0; DISC_BIT_1;	DISC_MODE; DISC_LOW;
   #if defined PB2_PULLDOWN
 	SET_BIT(GPIOB->CRL, GPIO_CRL_CNF2_1); CLEAR_BIT(GPIOB->ODR, GPIO_ODR_ODR2);
 	#endif // NB : PB2 is already in FLOATING mode by default.
+	#if defined PB2_LOW
+	CLEAR_BIT(GPIOB->CRL, GPIO_CRL_CNF2_0);
+	CLEAR_BIT(GPIOB->CRL, GPIO_CRL_CNF2_1);
+	SET_BIT(GPIOB->CRL, GPIO_CRL_MODE2);
+	WRITE_REG(GPIOA->BRR, GPIO_BRR_BR2);
+
+	#endif
 	SLEEP_U(1);
 	// GPIOs end ////////////////////////////////////////////////////////////////
 
@@ -152,22 +208,22 @@ void Reset_Handler(void)
 	// TKG-FLASH CLI activated upload during the bootloader startup
 	BootloaderState = BTL_WAITING;
 
+	USB_Shutdown();
+
 	bool MustEnterBooloader = (
 		CHECK_USER_CODE(USER_ADDR)
 		|| magicHere
 		|| READ_BIT(GPIOB->IDR, GPIO_IDR_IDR2 )
 	);
 
-	// Waiting loop around 2s
+	// Waiting loop around 3s
 	if ( ! MustEnterBooloader ) {
 			// If reset occurs before the end of loop,
 			// that will activate bootloader mode at the next reset
 			BKP->BACKUP_REG = MAGIC_WORD1;
-			for (uint16_t i = 1 ; i<20 ; i++) {
-				LED1_ON;
-				SLEEP_M(100);
-				LED1_OFF;
-				SLEEP_M(50);
+			for (uint16_t i = 1 ; i<15 ; i++) {
+				LED1_ON;  SLEEP_M(100);
+				LED1_OFF;	SLEEP_M(100);
 			}
 	}
 
@@ -180,20 +236,30 @@ void Reset_Handler(void)
 	// Lock Flash because of security.
 	SET_BIT(FLASH->CR, FLASH_CR_LOCK);
 
-	if (	MustEnterBooloader  ) {
-			USB_Shutdown();
-			SLEEP_S(4);
+	// Activate HID
+	// Setup a temporary vector table into SRAM, so we can handle USB IRQs //////
+	volatile uint32_t *const ram_vectors =	(volatile uint32_t *const) SRAM_BASE;
+	ram_vectors[INITIAL_MSP]                 = SRAM_END;
+	ram_vectors[RESET_HANDLER]               = (uint32_t) Reset_Handler;
+	ram_vectors[USB_LP_CAN1_RX0_IRQ_HANDLER] = (uint32_t) USB_LP_CAN1_RX0_IRQHandler;
+	__DSB();
+	SCB->VTOR = (volatile uint32_t) ram_vectors;
 
-			// // Setup a temporary vector table into SRAM, so we can handle USB IRQs //////
-			volatile uint32_t *const ram_vectors =	(volatile uint32_t *const) SRAM_BASE;
-			ram_vectors[INITIAL_MSP]                 = SRAM_END;
-			ram_vectors[RESET_HANDLER]               = (uint32_t) Reset_Handler;
-			ram_vectors[USB_LP_CAN1_RX0_IRQ_HANDLER] = (uint32_t) USB_LP_CAN1_RX0_IRQHandler;
-			__DSB();
-			SCB->VTOR = (volatile uint32_t) ram_vectors;
+	USB_Init();
 
-			USB_Init();
+	// 2nd Waiting round for an eventual bootloader START cmd
+	if ( ! MustEnterBooloader ) {
+			for (uint16_t i = 1 ; i<10 ; i++) {
+				if ( BootloaderState == BTL_STARTED ) {
+					MustEnterBooloader = true;
+					break;
+				}
+				LED1_ON; 	SLEEP_M(100);
+				LED1_OFF; SLEEP_M(100);
+			}
+	}
 
+	if (	MustEnterBooloader 	) {
 			// Flashing loop. Flashing is done in the ISR.
 			do {
 					SLEEP_M(1);
@@ -203,9 +269,12 @@ void Reset_Handler(void)
 					}
 			}	while (BootloaderState != BTL_END ) ;
 			USB_Shutdown();
-			SLEEP_S(4);
+			SLEEP_M(10);
 			NVIC_SystemReset();
 	}
+
+	USB_Shutdown();
+	SLEEP_M(2500);
 
 	LED1_OFF;
 	// Turn GPIO clocks off
