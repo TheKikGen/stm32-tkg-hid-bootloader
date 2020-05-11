@@ -84,6 +84,7 @@ generic-pb0: $(SRCS) clean gccversion build_generic-pb0 copy_generic-pb0 info si
 generic-pb12: $(SRCS) clean gccversion build_generic-pb12 copy_generic-pb12 info size
 mini-stm32v3: $(SRCS) clean gccversion build_mini-stm32v3 copy_mini-stm32v3 info size
 miditech4x4: $(SRCS) clean gccversion build_miditech4x4 copy_miditech4x4 info size
+midiplus-smartpad: $(SRCS) clean gccversion build_midiplus-smartpad copy_midiplus-smartpad info size
 
 build_maple-mini: TARGETFLAGS= -DTARGET_MAPLE_MINI
 build_maple-mini: LINKER_SCRIPT=STM32F103C8T6.ld
@@ -98,6 +99,13 @@ build_miditech4x4: $(BUILD_DIR)/$(TARGET).elf $(BUILD_DIR)/$(TARGET).bin
 copy_miditech4x4: $(BIN_DIR)
 	$(ECHO) "COPY    $(BIN_DIR)/tkg_hid_miditech4x4.bin"
 	$(Q)$(CP) $(BUILD_DIR)/$(TARGET).bin $(BIN_DIR)/tkg_hid_miditech4x4.bin
+
+build_midiplus-smartpad: TARGETFLAGS= -DTARGET_MIDIPLUS_SMARTPAD
+build_midiplus-smartpad: LINKER_SCRIPT=STM32F103C8T6.ld
+build_midiplus-smartpad: $(BUILD_DIR)/$(TARGET).elf $(BUILD_DIR)/$(TARGET).bin
+copy_midiplus-smartpad: $(BIN_DIR)
+	$(ECHO) "COPY    $(BIN_DIR)/tkg_hid_midiplus-smartpad.bin"
+	$(Q)$(CP) $(BUILD_DIR)/$(TARGET).bin $(BIN_DIR)/tkg_hid_midiplus-smartpad.bin
 
 build_generic-pc13: TARGETFLAGS= -DTARGET_GENERIC_F103_PC13
 build_generic-pc13: LINKER_SCRIPT=STM32F103C8T6.ld
