@@ -22,7 +22,6 @@
 
 #elif defined TARGET_MIDITECH4X4
 		// LED : PIN9 BANK C - STATE ON : 1
-		#define HAS_MIDITECH_HARDWARE 1
 		#define LED1_CLOCK	RCC_APB2ENR_IOPCEN
 		#define LED1_BIT_0	SET_BIT(GPIOC->CRH, GPIO_CRH_CNF9_0 | GPIO_CRH_MODE9)
 		#define LED1_BIT_1	//CLEAR_BIT(GPIOC->CRH, GPIO_CRH_CNF13_1)
@@ -38,19 +37,17 @@
 		#define DISC_LOW		WRITE_REG(GPIOA->BSRR, GPIO_BSRR_BS8) // set
 		#define DISC_HIGH		WRITE_REG(GPIOA->BSRR, GPIO_BSRR_BS8 << 16) // reset
 
+#elif defined TARGET_MIDIPLUS_SMARTPAD
 
-		// Enable the internal pull-down on PB2 pin. By default, PB2
-		// is in FLOATING input mode. (BOOT 1)
-		// //#define PB2_PULLDOWN
-		// #elif defined TARGET_SMARTPAD
-		// 	#define LED1_CLOCK		RCC_APB2ENR_IOPAEN
-		// 	#define LED2_CLOCK		RCC_APB2ENR_IOPCEN
-		//
-		// 	// USB pull-up
-		// 	#define PA8_HIGH
-		//
-		// 	// Col3 low
-		// 	#define PB2_LOW
+		// DISC : PIN8 BANK A
+		#define DISC_CLOCK	RCC_APB2ENR_IOPAEN
+		#define DISC_BIT_0	SET_BIT(GPIOA->CRH, GPIO_CRH_MODE8)
+		#define DISC_BIT_1	CLEAR_BIT(GPIOA->CRH, GPIO_CRH_CNF8_0 | GPIO_CRH_CNF8_1)
+		#define DISC_MODE
+		#define DISC_LOW		WRITE_REG(GPIOA->BSRR, GPIO_BSRR_BS8) // set
+		#define DISC_HIGH		WRITE_REG(GPIOA->BSRR, GPIO_BSRR_BS8 << 16) // reset
+
+		#define PB2_LOW
 
 #elif defined TARGET_GENERIC_F103_PC13
 	#define LED1_CLOCK		RCC_APB2ENR_IOPCEN
