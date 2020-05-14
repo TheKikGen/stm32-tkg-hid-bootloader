@@ -566,7 +566,7 @@ int main(int argc, char *argv[]) {
       }
     }
 
-    if ( ideEmb ) printf(&wfChar);
+    if ( ideEmb ) printf("%c",wfChar);
 
     // End of block. Wait for the bootloader ACK command. 10s TIMOUT
     if ( ! WaitForACK() ) {
