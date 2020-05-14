@@ -280,7 +280,7 @@ boolean SerialToggleDTR(char *serialPort) {
 // Return 1 if Found, -1: if Not found, -2: if version error
 // If no error, the device is opened with HidDeviceHandle
 ////////////////////////////////////////////////////////////////////////////////
-int HIDDeviceLookUp(boolean loop) {
+int HIDDeviceLookUp(bool loop) {
   struct hid_device_info *deviceInfo, *nextDevInfo;
   int r = -1;
 
