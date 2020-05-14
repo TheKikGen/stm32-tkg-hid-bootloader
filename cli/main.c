@@ -224,7 +224,7 @@ static int UsbWrite(uint8_t *data, size_t sz) {
 ////////////////////////////////////////////////////////////////////////////////
 // Start serial port
 ////////////////////////////////////////////////////////////////////////////////
-boolean SerialToggleDTR(char *serialPort) {
+bool SerialToggleDTR(char *serialPort) {
   const  char portMode[]={PORT_MODE};
 
   uint8_t nbTry = SERIAL_PORT_RETRY;
@@ -364,9 +364,9 @@ int main(int argc, char *argv[]) {
   int       error    = 0;
   char *serialPortId = (char *) NULL;
   uint8_t dumpSector = 0;
-  boolean infoMCU = false;
-  boolean simulFlash = false;
-  boolean ideEmb = false;
+  bool infoMCU = false;
+  bool simulFlash = false;
+  bool ideEmb = false;
   uint8_t PageOffset = 0;
 
   setbuf(stdout, NULL);
