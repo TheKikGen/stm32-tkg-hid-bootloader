@@ -225,7 +225,7 @@ void Reset_Handler(void)
 				LED1_ON;  SLEEP_M(100);
 				LED1_OFF;	SLEEP_M(100);
 			}
-	}
+	} else SLEEP_S(2);
 
 	// Set DR4 backup register to zero
 	// Then reset backup registers and the RTC.
