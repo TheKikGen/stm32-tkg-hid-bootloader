@@ -315,7 +315,7 @@ static void HIDUSB_HandleData(uint8_t *data)
 				PageOffset = 0;
 			}
 
-			// Flash the page at the requried address
+			// Flash the page at the required address
 			if (!Simul) FLASH_WritePage((uint16_t *)(FLASH_BASE_ADDR + CurrentPage * PageSize),
 			 				(uint16_t *) PageData, CurrentPageBytesOffset / 2);
 			CurrentPage++;
