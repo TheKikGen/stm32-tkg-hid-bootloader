@@ -491,7 +491,7 @@ int main(int argc, char *argv[]) {
     }
     // Wait for an ACK because we want to secure the simulation mode
     if (! WaitForACK() ) {
-      printf("\n  ** Error or timeout while waiting ACK from the bootloader.\n");
+      printf("\n  ** Error or timeout while waiting simulation mode ACK from the bootloader.\n");
       error = 1;
       goto exit;
     }
@@ -522,16 +522,21 @@ int main(int argc, char *argv[]) {
     goto exit;
   }
 
+  Sleep_s(1);
+
   // Now the bootloader knows we are starting the firmware file transmission
 
   // Prepare the progression bar
-  uint8_t   bar ;
-  float progression = 0;
+  uint8_t bar ;
+  float   progression = 0;
+  char    wfChar ;
+
   printf("\n");
   if ( !dumpSector && !ideEmb) {
-    printf("  ["); print_str_repeat('.',50); printf("]\r");
+      printf("  [");
+      print_str_repeat('.',50); printf("]\r");
   }
-  char wfChar ;
+
   if (simulFlash) wfChar ='-'; else wfChar = '+';
 
   // Prepare a first 1024 bytes block.
@@ -555,7 +560,7 @@ int main(int argc, char *argv[]) {
       }
 
       bytesSent += ( HID_TX_SIZE - 1 );
-      Sleep_u(500);
+      Sleep_m(1);
 
       if ( !dumpSector && !ideEmb) {
         // Show the progress
