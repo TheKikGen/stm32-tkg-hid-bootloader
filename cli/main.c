@@ -72,7 +72,7 @@ static const uint8_t CMD_SIGN[] = {'B','T','L','D','C','M','D'};
 
 #define VID           0x1209
 #define PID           0xBEBA
-#define FIRMWARE_VER  0x0100
+#define FIRMWARE_VER  0x2301
 
 // BTL Commands
 typedef enum {
