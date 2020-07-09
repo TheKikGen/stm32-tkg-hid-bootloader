@@ -72,7 +72,7 @@ static const uint8_t CMD_SIGN[] = {'B','T','L','D','C','M','D'};
 
 #define VID           0x1209
 #define PID           0xBEBA
-#define FIRMWARE_VER  0x0100
+#define FIRMWARE_VER  0x2301
 
 // BTL Commands
 typedef enum {
@@ -372,7 +372,7 @@ int main(int argc, char *argv[]) {
   setbuf(stdout, NULL);
 
   printf("\n+-----------------------------------------------------------------------+\n");
-  printf  ("|            TKG-Flash v2.3 STM32F103 HID Bootloader Flash Tool         |\n");
+  printf  ("|            TKG-Flash v2.3.1 STM32F103 HID Bootloader Flash Tool       |\n");
   printf  ("|                     High density device support.                      |\n");
   printf  ("|       (c) 2020 - The KikGen Labs     https://github.com/TheKikGen     |\n");
   printf  ("+-----------------------------------------------------------------------+\n\n");
