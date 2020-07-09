@@ -372,7 +372,7 @@ int main(int argc, char *argv[]) {
   setbuf(stdout, NULL);
 
   printf("\n+-----------------------------------------------------------------------+\n");
-  printf  ("|            TKG-Flash v2.3 STM32F103 HID Bootloader Flash Tool         |\n");
+  printf  ("|            TKG-Flash v2.3.1 STM32F103 HID Bootloader Flash Tool       |\n");
   printf  ("|                     High density device support.                      |\n");
   printf  ("|       (c) 2020 - The KikGen Labs     https://github.com/TheKikGen     |\n");
   printf  ("+-----------------------------------------------------------------------+\n\n");
