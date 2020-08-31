@@ -86,13 +86,13 @@ __ __| |           |  /_) |     ___|             |           |
 #define IS_VALID_FLASH_ADDRESS(addr) (((addr) >= 0x08000000) && ((addr) < 0x0807FFFF))
 
 // uSec delay macro (not really accurate !)
-#define SLEEP_U(us) delay(7*us)
+#define SLEEP_U(us) delay((uint32_t)(7*us))
 
 // millis delay macro
-#define SLEEP_M(ms) delay(72*ms*100)
+#define SLEEP_M(ms) delay((uint32_t)(72*ms*100))
 
 // seonds delay macro
-#define SLEEP_S(s) delay(72*s*100000)
+#define SLEEP_S(s) delay((uint32_t)(72*s*100000))
 
 // BTL Commands
 typedef enum {
