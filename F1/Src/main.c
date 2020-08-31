@@ -100,6 +100,7 @@ void BigJump(void) {
 ///////////////////////////////////////////////////////////////////////////////
 void Reset_Handler(void)
 {
+	USB_Shutdown();
 	SystemInit();
 	SystemCoreClockUpdate(); // 72 Mhz default
 
@@ -185,7 +186,7 @@ void Reset_Handler(void)
 
 	// 2nd Waiting round for an eventual bootloader START cmd
 	if ( ! MustEnterBooloader ) {
-			for (uint16_t i = 1 ; i<10 ; i++) {
+			for (uint16_t i = 1 ; i<15 ; i++) {
 				if ( BootloaderState == BTL_STARTED ) {
 					MustEnterBooloader = true;
 					break;
