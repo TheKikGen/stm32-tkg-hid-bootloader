@@ -99,7 +99,8 @@ __ __| |           |  /_) |     ___|             |           |
 #include "tkg_hid_generic_pc13.bin.h"
 #include "tkg_hid_miditech4x4.bin.h"
 
-#define FORCE_MODE_MIDITECH
+#define MIDITECH
+//#define HIGH_DENSITY
 
 #define EE_FLASH_MEMORY_BASE 0x08000000
 
@@ -353,13 +354,6 @@ void loop()
 {
 
 	uint16_t pageSize = 1024;
-	// #if defined(FORCE_MODE_MIDITECH)
-	// IsMidiface = 1;
-	// FlashHidBTL(pageSize);
-	// delay(10000);
-	//
-	// while (1);
-	// #endif
 
 	uint8_t c =0;
 	Serial.println("STM32F103 TKG HID BOOTLOADER HIGH DENSITY SUPPORT 2.2 - UPLOADER BY THE KIGEN LABS");
@@ -368,24 +362,22 @@ void loop()
 	Serial.println("and will replace any other bootloader in place.That will free about 6144 bytes for user programs.");
 	Serial.println("NB : Applications must be compiled against the right upload method as the vector table address is 0x08001000.");
 	Serial.println();
-	Serial.println("Do you want continue ? (Y/n)");
 
-	if ( (c= AskChar()) == 'Y' ) {
-		Serial.println("Is your device is High density (n if Bluepill) ? (Yn)");
-		if ( (c= AskChar()) == 'Y' ) {
+	#if defined(HIGH_DENSITY)
+ #warning HIGH DENSITY
 			pageSize = 2048;
-		}
-		Serial.println("Is your device is a MidiTech/MidiPlus midiface 4x4 interface ? (Yn)");
-		if ( (c= AskChar()) == 'Y' ) IsMidiface = 1;
+  #endif
 
-		Serial.println("Proceed ? (Y/n)");
-		if ( (c= AskChar()) == 'Y' ) {
-			FlashHidBTL(pageSize);
-			Serial.println("Bootloader flashed.");
-			Serial.println("Please reset the board.");
-			while(1);
-		}
-	}
+  #if defined(MIDITECH)
+    #warning MIDITECH
+      IsMidiface = 1;
+      pageSize = 2048;
+  #endif
 
-
+	FlashHidBTL(pageSize);
+	Serial.println("Bootloader flashed.");
+	Serial.println("Please reset the board.");
+	while(1);
 }
+
+
