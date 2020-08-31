@@ -1,4 +1,4 @@
-Check last release with binaries distribution here for Windows and Linux platforms here :   
+Check last release with binaries distribution for Windows and Linux platforms here :   
 https://github.com/TheKikGen/stm32-tkg-hid-bootloader/releases
 
 # STM32F10x TKG-HID-BOOTLOADER
