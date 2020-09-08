@@ -20,7 +20,7 @@ Latest version of the GCC ARM toolchain is recommended for building the bootload
 * "Double push" on the reset button
 * Automatic when flashing with TKG-FLASH if the right com port is given to toggle DTR (not always reliable)
 * BOOT1 set to HIGH (permanent with jumper set fro ultimate case !)
-* Writing the value **0x424C** in the DR10 backup register (ex : from you own firmware before rebooting) 
+* Writing the value **0x424C** in the DR10 backup register (ex : from your own firmware before rebooting) 
 * A START command from TKG-Flash tool
 
 
