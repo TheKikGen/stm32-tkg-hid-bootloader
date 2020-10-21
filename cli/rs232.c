@@ -34,7 +34,7 @@
 #include "rs232.h"
 
 
-#if defined(__linux__) || defined(__FreeBSD__)   /* Linux & FreeBSD */
+#if defined(__APPLE__) || defined(__linux__) || defined(__FreeBSD__)   /* OSX, Linux & FreeBSD */
 
 #define RS232_PORTNR  38
 
@@ -103,6 +103,7 @@ int RS232_OpenComport(int comport_number, int baudrate, const char *mode, int fl
                    break;
     case  230400 : baudr = B230400;
                    break;
+#if !defined(__APPLE__)
     case  460800 : baudr = B460800;
                    break;
     case  500000 : baudr = B500000;
@@ -127,6 +128,7 @@ int RS232_OpenComport(int comport_number, int baudrate, const char *mode, int fl
                    break;
     case 4000000 : baudr = B4000000;
                    break;
+#endif
     default      : printf("invalid baudrate\n");
                    return(1);
                    break;

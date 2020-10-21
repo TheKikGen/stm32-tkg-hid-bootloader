@@ -1,5 +1,5 @@
-News : First release with binaries ready to use for Windows and Linux platforms here :   
-https://github.com/TheKikGen/stm32-tkg-hid-bootloader/releases/tag/V2.3
+Check last release with binaries distribution for Windows and Linux platforms here :   
+https://github.com/TheKikGen/stm32-tkg-hid-bootloader/releases
 
 # STM32F10x TKG-HID-BOOTLOADER
 
@@ -20,7 +20,9 @@ Latest version of the GCC ARM toolchain is recommended for building the bootload
 * "Double push" on the reset button
 * Automatic when flashing with TKG-FLASH if the right com port is given to toggle DTR (not always reliable)
 * BOOT1 set to HIGH (permanent with jumper set fro ultimate case !)
-* Writing the value **0x424C** in the DR10 backup register (ex : from you own firmware before rebooting) 
+* Writing the value **0x424C** in the DR10 backup register (ex : from your own firmware before rebooting) 
+* A START command from TKG-Flash tool
+
 
 <img alt="TKG Bootloader logic" style="border-width:0" src="https://github.com/TheKikGen/stm32-tkg-hid-bootloader/blob/master/doc/TKG-HID-BOOTLOADER%20LOGIC.png?raw=true" /></a>
 
