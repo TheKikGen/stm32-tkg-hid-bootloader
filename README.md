@@ -101,4 +101,3 @@ You must then add an upload method in platform.txt :
 and copy the tkg-flash tool in the Arduino\hardware\Arduino_STM32\tool\win .
 You need to restart the Arduino IDE to see your changes.
 
-Note that the "HID Booloader 2.0" (in the Arduino IDE existing upload methods) can be used to flash your firmware with TKG-HID-BOOTLOADER. Obviously, better to do that with the companion CLI tool TKG-FLASH...
