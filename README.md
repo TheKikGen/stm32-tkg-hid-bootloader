@@ -30,17 +30,21 @@ Latest version of the GCC ARM toolchain is recommended for building the bootload
 # TKG-FLASH
 ``````
 +-----------------------------------------------------------------------+
-|           TKG-Flash v2.2.1 STM32F103 HID Bootloader Flash Tool        |
+|             TKG-Flash v2.4 STM32F103 HID Bootloader Flash Tool        |
 |                     High density device support.                      |
-|   (c)      2020 - The KikGen Labs     https://github.com/TheKikGen    |
+|       (c) 2020 - The KikGen Labs     https://github.com/TheKikGen     |
 +-----------------------------------------------------------------------+
+Build : 2.201022.1919
 
   Usage: tkg-flash <firmware file name> [<options>]
 
   Options are :
   -d=16 -d=32   : hexa dump sectors by 16 or 32 bytes line length.
+  -ide          : ide embedded, no progression bar, basic info.
+  -info         : get some information from the MCU to be flashed.
+  -o=<n>        : offset the default flash start page of 1-255 page(s)
   -p=<com port> : serial com port used to toggle DTR for MCU reset.
-  -s            : flashing simulation.
+  -sim          : flashing simulation.
   -w=<time s>   : HID device waiting time (10s default).
 
   Examples :
