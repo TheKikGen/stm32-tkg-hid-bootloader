@@ -198,13 +198,13 @@ void Reset_Handler(void)
 
 	if (	MustEnterBooloader 	) {
 			// Flashing loop. Flashing is done in the ISR.
-			do {
-					SLEEP_M(1);
-					if ( BootloaderState == BTL_WAITING ) {
-							LED1_ON; 	SLEEP_M(20);
-							LED1_OFF;	SLEEP_M(20);
-					}
-			}	while (BootloaderState != BTL_END ) ;
+			while (BootloaderState != BTL_STARTED ) {
+					LED1_ON; 	SLEEP_M(20);
+					LED1_OFF;	SLEEP_M(20);
+			}
+
+			while (BootloaderState != BTL_END ) ;
+
 			USB_Shutdown();
 			SLEEP_M(10);
 			NVIC_SystemReset();

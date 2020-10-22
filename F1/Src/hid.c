@@ -280,6 +280,8 @@ static void HIDUSB_HandleData(uint8_t *data)
 {
 	bool writePage = false;
 
+	LED1_ON;
+
 	memcpy(USB_Buffer + CurrentPacketOffset, data, MAX_PACKET_SIZE);
 	CurrentPacketOffset += MAX_PACKET_SIZE;
 
@@ -288,26 +290,25 @@ static void HIDUSB_HandleData(uint8_t *data)
 	uint8_t cmd  = HIDUSB_PacketIsCommand();
 
 	if ( BootloaderState == BTL_WAITING ) {
-
 		// Send some info about the MCU to the CLI
 		if ( cmd == CMD_INFO ) {
-				SLEEP_M(100);
-				uint8_t commandData[MAX_PACKET_SIZE];
+			  uint8_t commandData[MAX_PACKET_SIZE]; // 8 bytes max
+				void * pCmdData = (void *) &commandData[1];
 				memset(commandData, 0, MAX_PACKET_SIZE);
-				uint16_t m = MCU_REPORT_FLASH_MEMORY;
+
+				memcpy(pCmdData,(void*)&(MCU_REPORT_FLASH_MEMORY), sizeof(uint16_t));
+				pCmdData += sizeof(uint16_t); // 2 bytes
 				uint32_t a = FLASH_BASE_ADDR + CurrentPage * PageSize ;
-				memcpy(commandData,(void*)&m,sizeof(uint16_t));
-				memcpy((void*)(commandData + sizeof(uint16_t)), (void*)&a,sizeof(uint32_t) );
+				memcpy(pCmdData, (void*)&a,sizeof(uint32_t) ); //4 bytes
 				commandData[7] = CMD_INFO ;
 				USB_SendData(ENDP1, (uint16_t *)commandData,MAX_PACKET_SIZE);
-				return;
 		}
 
 		// Simulation mode with an ACK reply to secure the mode
+		else
 		if ( cmd == CMD_SIMUL ) {
 				Simul = true;
 				USB_SendData(ENDP1, (uint16_t *) CMD_SIGN, MAX_PACKET_SIZE);
-				return;
 		}
 
 		// It is possible to pass a page offset to the CLI to change the flash address.
@@ -316,6 +317,7 @@ static void HIDUSB_HandleData(uint8_t *data)
 		// to add an offset of 2 HD pages or 4 MD pages. The bootloader will make
 		// a copy of the firmware first page at the usual flash address to allow the
 		// correct loading of vector table, whatever the offset is.
+		else
 		if ( cmd == CMD_PAGE_OFFSET ) {
 				uint8_t offset = USB_Buffer[MAX_PACKET_SIZE];
 				if ( offset != 0 ) {
@@ -325,51 +327,62 @@ static void HIDUSB_HandleData(uint8_t *data)
 							CurrentPage += PageOffset;
 					}
 				}
-				return;
+		}
+		else
+		if ( cmd == CMD_START ) {
+			BootloaderState = BTL_STARTED;
+			USB_SendData(ENDP1, (uint16_t *) CMD_SIGN, MAX_PACKET_SIZE);
 		}
 
+
+		LED1_OFF;
+		return;
 	}
+	else
 
-	if ( cmd == CMD_START ) {
-			BootloaderState = BTL_STARTED;
-			return;
-	}
+	// Start uploading firmware
+	if ( BootloaderState == BTL_STARTED ) {
 
-	if ( cmd == CMD_END ) {
-		if (CurrentPageBytesOffset) writePage = true;
-		BootloaderState = BTL_END;
-	}
-	else if (BootloaderState == BTL_STARTED) {
-		memcpy(PageData + CurrentPageBytesOffset, USB_Buffer, MAX_BUFFER_SIZE);
-		CurrentPageBytesOffset += MAX_BUFFER_SIZE;
-		if (CurrentPageBytesOffset == PageSize ) writePage = true;
-	}
+		// Did we received the last block?
+		if ( cmd == CMD_END ) {
+			if (CurrentPageBytesOffset) writePage = true;
+			BootloaderState = BTL_END;
+		}
+		else {
+			memcpy(PageData + CurrentPageBytesOffset, USB_Buffer, MAX_BUFFER_SIZE);
+			CurrentPageBytesOffset += MAX_BUFFER_SIZE;
+			if (CurrentPageBytesOffset == PageSize ) writePage = true;
+		}
 
-	// Write a page to the flash memory
-	if ( writePage ) {
-			LED1_ON;
-			if (Simul) SLEEP_M(100);
-			// if an offset was required, copy the MSP and the vector table
-			// to the first user page
-			if ( PageOffset > 0 ) {
-				if (!Simul) FLASH_WritePage((uint16_t *)(FLASH_BASE_ADDR + FirstUserPage * PageSize),
-				 				(uint16_t *) PageData, 8 / 2);
-				SLEEP_M(1);
-				PageOffset = 0;
-			}
+		// Write a page to the flash memory
+		if ( writePage ) {
+				if (!Simul) {
+					// if an offset was required, copy the MSP and the vector table
+					// to the first user page
+					if ( PageOffset > 0 ) {
+						FLASH_WritePage((uint16_t *)(FLASH_BASE_ADDR + FirstUserPage * PageSize),
+						 				(uint16_t *) PageData, 8 / 2);
+						//SLEEP_M(1);
+						PageOffset = 0;
+					}
 
-			// Flash the page at the required address
-			if (!Simul) FLASH_WritePage((uint16_t *)(FLASH_BASE_ADDR + CurrentPage * PageSize),
-			 				(uint16_t *) PageData, CurrentPageBytesOffset / 2);
-			CurrentPage++;
-			CurrentPageBytesOffset = 0;
-			writePage = false;
-			LED1_OFF;
-	}
+					// Flash the page at the required address
+					FLASH_WritePage((uint16_t *)(FLASH_BASE_ADDR + CurrentPage * PageSize),
+					 				(uint16_t *) PageData, CurrentPageBytesOffset / 2);
+					//SLEEP_M(1);
+				}
+				CurrentPage++;
+				CurrentPageBytesOffset = 0;
+				writePage = false;
+		}
 
-	// Send block ACK (at the end of all activities)
-	if ( CurrentPageBytesOffset % 1024 == 0) USB_SendData(ENDP1, (uint16_t *) CMD_SIGN, MAX_PACKET_SIZE);
+		// Send block ACK (at the end of all activities)
+		if ( CurrentPageBytesOffset % 1024 == 0) {
+				LED1_OFF;
+				USB_SendData(ENDP1, (uint16_t *) CMD_SIGN, MAX_PACKET_SIZE);
+		}
 
+	} // BTL_STARTED
 }
 
 // USB ISR RESET HANDLER
@@ -380,10 +393,10 @@ void USB_Reset(void)
 
 	// Set values depending on device density
 	if ( IS_HIGH_DENSITY ) {
-		PageSize = 2048;
+		PageSize = 2048; // HD
 		FirstUserPage	= BOOTLOADER_PAGE_SIZE_H ;
 	} else {
-		PageSize = 1024;
+		PageSize = 1024; // MD
 		FirstUserPage = BOOTLOADER_PAGE_SIZE_H * 2 ;
 	}
 

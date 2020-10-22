@@ -55,7 +55,7 @@ __ __| |           |  /_) |     ___|             |           |
 #include <stdbool.h>
 #include "rs232.h"
 #include "hidapi.h"
-
+#include "build_number_defines.h"
 
 // HID read timeout in milliseconds
 #define HID_READ_TIMEOUT 1000000
@@ -349,8 +349,8 @@ static bool WaitForInfoBlock(uint8_t *infoBlock) {
   while ( hid_read_timeout(HidDeviceHandle,infoBlock, HID_RX_SIZE,0) != HID_RX_SIZE
             && infoBlock[7] != CMD_INFO ) {
 
-              Sleep_m(100) ;
-              if ( ! SendBTLCmd(CMD_INFO,0)) return false ;
+              Sleep_m(2) ;
+              //if ( ! SendBTLCmd(CMD_INFO,0)) return false ;
   }
 
   return true;
@@ -371,11 +371,30 @@ int main(int argc, char *argv[]) {
 
   setbuf(stdout, NULL);
 
+  const char TimeStampedVersion[] = {
+    VERSION_MAJOR_INIT,
+    '.',
+      BUILD_YEAR_CH2,
+    BUILD_YEAR_CH3,
+      BUILD_MONTH_CH0,
+    BUILD_MONTH_CH1,
+      BUILD_DAY_CH0,
+    BUILD_DAY_CH1,
+    '.',
+    BUILD_HOUR_CH0,
+  BUILD_HOUR_CH1,
+    BUILD_MIN_CH0,
+  BUILD_MIN_CH1,
+  0
+  };
+
+
   printf("\n+-----------------------------------------------------------------------+\n");
-  printf  ("|            TKG-Flash v2.3.1 STM32F103 HID Bootloader Flash Tool       |\n");
+  printf  ("|             TKG-Flash v%d.%d STM32F103 HID Bootloader Flash Tool        |\n",VERSION_MAJOR,VERSION_MINOR);
   printf  ("|                     High density device support.                      |\n");
   printf  ("|       (c) 2020 - The KikGen Labs     https://github.com/TheKikGen     |\n");
-  printf  ("+-----------------------------------------------------------------------+\n\n");
+  printf  ("+-----------------------------------------------------------------------+\n");
+  printf  ("Build : %s\n\n",(char*) TimeStampedVersion);
 
   if(argc < 2) {
     ShowHelp();
@@ -399,25 +418,24 @@ int main(int argc, char *argv[]) {
       }
       else
       // Dump 16
-      if ( strncmp("-d=16",argv[i],5) == 0 ) dumpSector = 16;
+      if ( strcmp("-d=16",argv[i]) == 0 ) dumpSector = 16;
       else
 
       // Dump 32
-      if ( strncmp("-d=32",argv[i],5) == 0 ) dumpSector = 32;
+      if ( strcmp("-d=32",argv[i]) == 0 ) dumpSector = 32;
       else
 
       // MCU Info
-      if ( strncmp("-info",argv[i],5) == 0 ) infoMCU = true;
+      if ( strcmp("-info",argv[i]) == 0 ) infoMCU = true;
       else
 
 
-      // IDE intrgation (ex Arduino)
-      if ( strncmp("-ide",argv[i],4) == 0 ) ideEmb = true;
+      // IDE integration (ex Arduino)
+      if ( strcmp("-ide",argv[i]) == 0 ) ideEmb = true;
       else
 
       // Flash simulation
-      if ( strncmp("-sim",argv[i],4) == 0 ) simulFlash = true;
-
+      if ( strcmp("-sim",argv[i]) == 0 ) simulFlash = true;
       else  {
         printf("  ** Error - Unknow command line parameter.\n");
         return 1;
@@ -472,7 +490,6 @@ int main(int argc, char *argv[]) {
 
   printf("> Flashing firmware");
   if (simulFlash) printf(" (SIMULATION)");
-  if (infoMCU) printf(" (INFO)");
   printf(" :\n");
 
   // Pages offset
@@ -482,7 +499,7 @@ int main(int argc, char *argv[]) {
     goto exit;
   }
 
-  // Send IMUL command if simulation mode
+  // Send SIMUL command if simulation mode
   if (simulFlash) {
     if ( ! SendBTLCmd(CMD_SIMUL,0)  ) {
       printf("  ** Error while sending bootloader SIMUL command.\n");
@@ -506,8 +523,8 @@ int main(int argc, char *argv[]) {
         error = 1;
         goto exit;
     } else {
-        uint16_t m = *(uint16_t *)infoBlock;
-        uint32_t a = *(uint32_t *)(infoBlock + sizeof(uint16_t));
+        uint16_t m = *(uint16_t *)&infoBlock[1];
+        uint32_t a = *(uint32_t *)&infoBlock[1 + sizeof(uint16_t)];
         printf("  INFO - Informations reported by the MCU :\n");
         printf("      Flash memory size  : %d K (%s density device)\n",m,
                        (m <= 128 ? "medium":"high") );
@@ -522,9 +539,15 @@ int main(int argc, char *argv[]) {
     goto exit;
   }
 
-  Sleep_s(1);
+  // Wait for an ACK because we want to secure the upload START
+  if (! WaitForACK() ) {
+    printf("\n  ** Error or timeout while waiting START ACK from the bootloader.\n");
+    error = 1;
+    goto exit;
+  }
 
   // Now the bootloader knows we are starting the firmware file transmission
+  printf("  START command sent successfully.\n");
 
   // Prepare the progression bar
   uint8_t bar ;
