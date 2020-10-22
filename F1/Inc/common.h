@@ -79,8 +79,8 @@ __ __| |           |  /_) |     ___|             |           |
 #define CHECK_USER_CODE(addr) ( ( (*(volatile uint32_t *) addr ) & 0x2FFE0000 ) != SRAM_BASE )
 
 // macro to detect a high density device from the flash memory size
-#define MCU_REPORT_FLASH_MEMORY (*(uint16_t *)0x1FFFF7E0 )
-#define IS_HIGH_DENSITY (MCU_REPORT_FLASH_MEMORY > 128)
+#define MCU_REPORT_FLASH_MEMORY *((uint16_t *)0x1FFFF7E0)
+#define IS_HIGH_DENSITY ( MCU_REPORT_FLASH_MEMORY > 128)
 
 // macro to validate a flash address
 #define IS_VALID_FLASH_ADDRESS(addr) (((addr) >= 0x08000000) && ((addr) < 0x0807FFFF))
