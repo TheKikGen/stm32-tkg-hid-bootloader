@@ -54,6 +54,16 @@ The TKG-FLASH tool can be considered as a new version of HID-FLASH 2.2.  The fol
 * Flashing simulation : same behaviour but no writes at all to the flash memory
 * Dump file feature
 
+Examples :
+
+To flash myfirmware.bin under windows, using COM1 DTR as reset method :
+           
+    tkg-flash myfirmware.bin -p=COM1
+
+To do the same under Linux :
+
+    tkg-flash myfirmware.bin -p=ttyACM0s
+
 # Adding a new upload method to the Arduino platform (short description)
 
 First, you must add a new upload method in board.txt (usually located at ..\Arduino\hardware\Arduino_STM32\STM32F1
