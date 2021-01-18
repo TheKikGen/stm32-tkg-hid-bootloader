@@ -219,8 +219,7 @@ void Reset_Handler(void)
 
 	// Go to user code
 	BigJump();
-	for (;;) {
-		;
-	}
+	// Never reached.
+	for (;;) ;
 
 }
