@@ -192,24 +192,16 @@ static const uint8_t USB_LangIDStringDescriptor[] = {
 	0x09, 0x04		// English (United States)
 };
 
-static const uint8_t USB_VendorStringDescriptor[] = {
-	0x20,			// bLength
-	0x03,			// bDescriptorType (String)
-	'T', 0, 'h', 0, 'e', 0, ' ', 0, 'K', 0, 'i', 0, 'K', 0, 'G', 0, 'e', 0,
-	'n', 0, ' ', 0, 'L', 0, 'a', 0, 'b', 0, 's', 0,
-};
-
+#define STRING_IPRODUCT_LEN 8
 static const uint8_t USB_ProductStringDescriptor[] = {
-	0x2C,			// bLength
+	STRING_IPRODUCT_LEN * 2 + 2,			// bLength of the descriptor
 	0x03,			// bDescriptorType (String)
-	'S', 0, 'T', 0, 'M', 0, '3', 0, '2', 0, 'F', 0, ' ', 0, 'H', 0, 'I', 0,
-	'D', 0, ' ', 0, 'B', 0, 'o', 0, 'o', 0, 't', 0, 'l', 0, 'o', 0, 'a', 0,
-	'd', 0, 'e', 0, 'r', 0
+	'T', 0, 'K', 0, 'G', 0, 'L', 0, ' ', 0, 'B', 0,	'T', 0,	'L', 0,
 };
 
 static void HIDUSB_GetDescriptor(USB_SetupPacket *setup_packet)
 {
-	uint16_t *descriptor = 0;
+	uint16_t *descriptor = NULL;
 	uint16_t length = 0;
 
 	switch (setup_packet->wValue.H) {
@@ -235,11 +227,8 @@ static void HIDUSB_GetDescriptor(USB_SetupPacket *setup_packet)
 	 	 	length = sizeof (USB_LangIDStringDescriptor);
 	 	 	break;
 
-	 	 case 0x01:
-	 	 	descriptor = (uint16_t *) USB_VendorStringDescriptor;
-	 	 	length = sizeof (USB_VendorStringDescriptor);
-	 	 	break;
-
+		 // Use the same string desc for vendor (01) & product (02)
+		 case 0x01:
 	 	 case 0x02:
 	 	 	descriptor = (uint16_t *) USB_ProductStringDescriptor;
 	 	 	length = sizeof (USB_ProductStringDescriptor);
