@@ -91,7 +91,7 @@ __ __| |           |  /_) |     ___|             |           |
 // millis delay macro
 #define SLEEP_M(ms) delay((uint32_t)(72*ms*100))
 
-// seonds delay macro
+// seconds delay macro
 #define SLEEP_S(s) delay((uint32_t)(72*s*100000))
 
 // BTL Commands
