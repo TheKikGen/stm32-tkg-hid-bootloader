@@ -1,0 +1,32 @@
+###########################################
+# Simple Makefile for TKG-FLASH HID program
+#
+# WINDOWS PLATFORM
+# To cross compile for windows, install mingw32
+#
+# TheKikGen Labs
+# 2021-01-20
+###########################################
+
+CC=i686-w64-mingw32-gcc
+CFLAGS=-c -Wall
+LDFLAGS=
+SOURCES   = tkg-flash.c rs232.c hidapi/windows/hid.c
+OBJS      = $(COBJS)
+LIBS      = -lsetupapi -lhid
+INCLUDES ?= -I./hidapi/hidapi -I../hidapi
+
+OBJECTS=$(SOURCES:.c=.o)
+
+EXECUTABLE = binaries_dist/tkg-flash.exe
+
+all: $(SOURCES) $(EXECUTABLE)
+
+$(EXECUTABLE): $(OBJECTS)
+	$(CC) $(LDFLAGS) $(OBJECTS) $(LIBS) -o $@
+
+.c.o:
+	$(CC) $(CFLAGS) $(INCLUDES) $< -o $@
+
+clean:
+	rm -f $(OBJECTS) $(EXECUTABLE)
