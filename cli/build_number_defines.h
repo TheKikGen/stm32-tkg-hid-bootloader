@@ -47,8 +47,9 @@ __ __| |           |  /_) |     ___|             |           |
 #ifndef BUILD_DEFS_H
 #define BUILD_DEFS_H
 
-#define VERSION_MAJOR 2
-#define VERSION_MINOR 4
+#define VERSION_MAJOR 3
+#define VERSION_MINOR 1
+#define VERSION_BCD ( (VERSION_MAJOR << 8) + ( VERSION_MINOR << 4 ) )
 
 // Example of __DATE__ string: "Jul 27 2012"
 //                              01234567890
