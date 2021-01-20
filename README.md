@@ -107,16 +107,18 @@ A special stm32duino sketch project can be found at https://github.com/TheKikGen
 
 * Load the project in the Arduino IDE
 * Specify the right uploading method in th "tools" menu, corresponding to your current bootloader
-* uncomment one of the target in the .ino source. Usually with a Bluepill STM32F103C you will choose GENERIC_PC13.
+* uncomment one of the target in the .ino source. Usually for a Bluepill STM32F103C you will choose GENERIC_PC13.
 ``````
 // --- TARGETS ---
 #define GENERIC_PC13
 //#define MIDITECH_MIDIFACE
 //#define MIDIPLUS_SMART_PAD
 ``````
-* The flash will start tp write the new bootloader at 0x08000000 immediatly. You can open a terminal to check the upgrade result.
-* "Double click" reset button to go directly in bootloader mode and flash your own firmware with tkgfalsh, or use "tkgflash -info" to check the firmware.
-* You can use CTRL + ALT + S to get a binary in the tkg_hid_btl_uploader directory.
+* The flash operation will start and the new bootloader will be written at 0x08000000.
+* You can open a serial terminal to check eventual error messages.
+* "Double click" reset button to go directly in bootloader mode and flash your own firmware with tkgflash
+* You can use "tkgflash -info" to check the current bootloader firmware.
+* You can also use CTRL + ALT + S to get a binary in the tkg_hid_btl_uploader directory.
 
 # Adding a new upload method to the Arduino platform (short description)
 
