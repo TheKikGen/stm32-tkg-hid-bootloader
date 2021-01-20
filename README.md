@@ -116,8 +116,8 @@ A special stm32duino sketch project can be found at https://github.com/TheKikGen
 ``````
 * The flash operation will start and the new bootloader will be written at 0x08000000.
 * You can open a serial terminal to check eventual error messages.
-* "Double click" reset button to go directly in bootloader mode and flash your own firmware with tkgflash
-* You can use "tkgflash -info" to check the current bootloader firmware.
+* "Double click" reset button to go directly in bootloader mode and flash your own firmware with tkg-flash
+* You can use "tkg-flash -info" to check the current bootloader firmware.
 * You can also use CTRL + ALT + S to get a binary in the tkg_hid_btl_uploader directory.
 
 # Adding a new upload method to the Arduino platform (short description)
