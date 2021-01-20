@@ -50,12 +50,22 @@ __ __| |           |  /_) |     ___|             |           |
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <unistd.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <hidapi.h>
 #include "rs232.h"
-#include "hidapi.h"
 #include "build_number_defines.h"
+
+// Headers needed for sleeping.
+#ifdef _WIN32
+	#include <windows.h>
+#else
+	#include <unistd.h>
+#endif
+
+
+/*!< MCU FLASH base address in the alias region */
+#define FLASH_BASE_ADDR            ((uint32_t)0x08000000)
 
 // HID read timeout in milliseconds
 #define HID_READ_TIMEOUT 1000000
@@ -70,9 +80,11 @@ __ __| |           |  /_) |     ___|             |           |
 // Bootloader command
 static const uint8_t CMD_SIGN[] = {'B','T','L','D','C','M','D'};
 
-#define VID           0x1209
-#define PID           0xBEBA
-#define FIRMWARE_VER  0x0100
+#define VID              0x1209
+#define PID              0xBEBA
+
+// Minimal compatible bootloader firmware
+#define MIN_FIRMWARE_VER 0x0240
 
 // BTL Commands
 typedef enum {
@@ -187,11 +199,14 @@ static void print_str_repeat(char c, int n) {
 // Show user help
 ////////////////////////////////////////////////////////////////////////////////
 static void ShowHelp() {
-  printf("  Usage: tkg-flash <firmware file name> [<options>]\n\n");
+  printf("  Usage: tkg-flash <firmware file name> [<options>]\n");
+  printf("         tkg-flash -info\n\n");
+
   printf("  Options are :\n");
+  printf("  -info         : get only some information from the MCU without flashing.\n\n");
+  printf("  Flashing options :\n");
   printf("  -d=16 -d=32   : hexa dump sectors by 16 or 32 bytes line length.\n");
   printf("  -ide          : ide embedded, no progression bar, basic info.\n");
-  printf("  -info         : get some information from the MCU to be flashed.\n");
   printf("  -o=<n>        : offset the default flash start page of 1-255 page(s)\n");
   printf("  -p=<com port> : serial com port used to toggle DTR for MCU reset.\n");
   printf("  -sim          : flashing simulation.\n");
@@ -277,36 +292,27 @@ bool SerialToggleDTR(char *serialPort) {
 ////////////////////////////////////////////////////////////////////////////////
 // Look up for our bootloader in the USB devices
 //------------------------------------------------------------------------------
-// Return 1 if Found, -1: if Not found, -2: if version error
-// If no error, the device is opened with HidDeviceHandle
+// Return  -1: if Not found, else version
 ////////////////////////////////////////////////////////////////////////////////
-int HIDDeviceLookUp(bool loop) {
-  struct hid_device_info *deviceInfo, *nextDevInfo;
-  int r = -1;
-
-  uint8_t nbTry = loop ? USBTimeout : 1 ;
+int HIDDeviceLookUp(bool oneShot) {
+  struct hid_device_info *deviceInfo;
+  int v = -1;
 
   // N try, more or less N sec to open the right HID device.
-  for( uint8_t i = 0; i < nbTry ; i++ ) {
+  for( uint8_t i = 0; i < USBTimeout ; i++ ) {
     printf("> Searching for [%04X:%04X] HID device...",VID,PID);
     printf("%c\r",HourGlass());
 
     deviceInfo = hid_enumerate(VID, PID);
-    nextDevInfo = deviceInfo;
-    // Search for valid HID Bootloader USB devices
-    while ( nextDevInfo && r == -1 ) {
-      // Version check
-      if( nextDevInfo->release_number < FIRMWARE_VER ) r = -2;
-      else if ( (HidDeviceHandle = hid_open(VID, PID, NULL)) ) r = 1;
-      nextDevInfo = deviceInfo->next;
-    }
+    if ( deviceInfo) v = deviceInfo->release_number;
     hid_free_enumeration(deviceInfo);
-    if ( r != -1 ) break;
+    if ( v != -1 || oneShot ) break;
     Sleep_s(1);
   }
   printf("\n");
-  return r;
+  return v;
 }
+
 ////////////////////////////////////////////////////////////////////////////////
 // Send a bootloader command
 ////////////////////////////////////////////////////////////////////////////////
@@ -329,30 +335,80 @@ static bool SendBTLCmd(BTLCommand_t cmd, uint8_t cmdData) {
 static bool WaitForACK(void) {
   uint8_t cmdBuff[HID_RX_SIZE];
 
-  while ( hid_read_timeout(HidDeviceHandle,cmdBuff, HID_RX_SIZE,0) != HID_RX_SIZE
-            && cmdBuff[7] != CMD_ACK )  Sleep_m(2);
+  while ( hid_read(HidDeviceHandle,cmdBuff, HID_RX_SIZE) != HID_RX_SIZE
+            && cmdBuff[7] != CMD_ACK )
+  {
+              Sleep_m(10);
+  }
 
   return true;
-
-  // do {
-  //     hid_read(HidDeviceHandle,cmdBuff, HID_RX_SIZE) ;
-  //     Sleep_u(500);
-  // } while( cmdBuff[7] != CMD_ACK);
 }
 
-////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////ac////////////////////////////
 // Wait for a valid bootloader info block command
 ////////////////////////////////////////////////////////////////////////////////
 static bool WaitForInfoBlock(uint8_t *infoBlock) {
 
   if ( ! SendBTLCmd(CMD_INFO,0)) return false ;
-  while ( hid_read_timeout(HidDeviceHandle,infoBlock, HID_RX_SIZE,0) != HID_RX_SIZE
+  while ( hid_read(HidDeviceHandle,infoBlock, HID_RX_SIZE) != HID_RX_SIZE
             && infoBlock[7] != CMD_INFO ) {
 
-              Sleep_m(2) ;
-              //if ( ! SendBTLCmd(CMD_INFO,0)) return false ;
+              Sleep_m(10) ;
   }
 
+  return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Wait for a checksum. Return false if checksum doesn't match
+////////////////////////////////////////////////////////////////////////////////
+static bool WaitForChecksum(uint8_t ck) {
+  uint8_t cmdBuff[HID_RX_SIZE];
+
+  while ( hid_read(HidDeviceHandle,cmdBuff, HID_RX_SIZE) != HID_RX_SIZE
+            && cmdBuff[7] != CMD_END )
+  {
+              Sleep_m(10);
+  }
+  return ( cmdBuff[0] == ck );
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Get MCU informations
+////////////////////////////////////////////////////////////////////////////////
+static bool ShowBootloaderInfo(int version) {
+
+  uint8_t infoBlock[HID_RX_SIZE];
+  // Wait for info blockc
+  if ( ! WaitForInfoBlock(infoBlock) ) {
+      printf("\n  ** Error or timeout while waiting info block from the bootloader.\n");
+      return false;
+  } else {
+      uint16_t memSz     = *( (uint16_t *)infoBlock );
+      uint16_t pageSz    = (memSz > 128 ? 2048:1024);
+
+      // Since version 0310, the bootloader send only the page offset
+      // so we can recalculate the base address
+      uint32_t flashAddr = 0;
+      uint8_t  pageOfs = 0 ;
+
+      if ( version >= 0X310 ) {
+        pageOfs   = infoBlock[2];
+        flashAddr = FLASH_BASE_ADDR + pageOfs * pageSz;
+      }
+      else {
+        flashAddr =  *(uint32_t *)(infoBlock + sizeof(uint16_t));
+        pageOfs = ( flashAddr -  FLASH_BASE_ADDR ) / pageSz;
+      }
+
+      printf("  INFO - Informations reported by the bootloader :\n");
+      printf("      Firmware version       : %04X\n",version);
+      printf("      MCU Flash memory size  : %d K (%s density device)\n",memSz,
+                     (memSz <= 128 ? "medium":"high") );
+      printf("      Page size              : %d bytes\n", pageSz );
+      printf("      Page offset            : %d pages\n", pageOfs );
+      printf("      Flash base address     : 0x%08X\n",flashAddr);
+  }
   return true;
 }
 
@@ -361,13 +417,15 @@ static bool WaitForInfoBlock(uint8_t *infoBlock) {
 ////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char *argv[]) {
 
-  int       error    = 0;
-  char *serialPortId = (char *) NULL;
-  uint8_t dumpSector = 0;
-  bool infoMCU = false;
-  bool simulFlash = false;
-  bool ideEmb = false;
-  uint8_t PageOffset = 0;
+  int      error = 0;
+  char     *serialPortId = (char *) NULL;
+  uint8_t  dumpSector = 0;
+  bool     simulFlash = false;
+  bool     ideEmb = false;
+  uint8_t  PageOffset = 0;
+  bool     infoMode = false;
+  uint8_t  cksum = 0;
+
 
   setbuf(stdout, NULL);
 
@@ -390,16 +448,23 @@ int main(int argc, char *argv[]) {
 
 
   printf("\n+-----------------------------------------------------------------------+\n");
-  printf  ("|             TKG-Flash v%d.%d STM32F103 HID Bootloader Flash Tool        |\n",VERSION_MAJOR,VERSION_MINOR);
+  printf  ("|             TKG-Flash v%d.%d STM32F103 HID Bootloader Flash Tool        |\n",
+  VERSION_MAJOR,VERSION_MINOR);
   printf  ("|                     High density device support.                      |\n");
   printf  ("|       (c) 2020 - The KikGen Labs     https://github.com/TheKikGen     |\n");
   printf  ("+-----------------------------------------------------------------------+\n");
   printf  ("Build : %s\n\n",(char*) TimeStampedVersion);
 
-  if(argc < 2) {
+  if(argc < 2 ) {
     ShowHelp();
     return 1;
-  } else {
+  }
+
+  else if ( argc == 2 && strcmp("-info",argv[1]) == 0 ) {
+      // Info mode without flashing
+      infoMode = true;
+  }
+  else {
     // Scan command line
     for ( int i = 2 ; i < argc ; i++ ) {
       // Com port
@@ -425,11 +490,6 @@ int main(int argc, char *argv[]) {
       if ( strcmp("-d=32",argv[i]) == 0 ) dumpSector = 32;
       else
 
-      // MCU Info
-      if ( strcmp("-info",argv[i]) == 0 ) infoMCU = true;
-      else
-
-
       // IDE integration (ex Arduino)
       if ( strcmp("-ide",argv[i]) == 0 ) ideEmb = true;
       else
@@ -441,6 +501,58 @@ int main(int argc, char *argv[]) {
         return 1;
       }
     }
+  }
+
+  // HID init
+  if (hid_init()) {
+      printf("  ** Error - HID init unknow error.\n");
+      error = 1;
+      goto exit;
+  }
+
+  // Check first HID presence to avoid tries loop if already here
+  int btlVersion = HIDDeviceLookUp(true);
+  if ( btlVersion < 0 ) {
+
+    // Reset the board by toggling DTR
+    if ( serialPortId ) {
+      if( !SerialToggleDTR(serialPortId) != 0 ) {
+        printf("  ** Warning - Unable to open serial port [%s]\n",serialPortId);
+      }
+    }
+
+    // Check HID again
+    btlVersion = HIDDeviceLookUp(false);
+    if ( btlVersion < 0 ) {
+      printf("  ** Error - [%04X:%04X] HID device was not found.\n",VID,PID);
+      error = 1;
+      goto exit;
+     }
+  }
+
+  if ( btlVersion < MIN_FIRMWARE_VER ) {
+    printf("  ** Error - Incompatible TKGL HID bootloader version %04X.\n",btlVersion);
+    printf("             Minimal version must be %04X.\n",MIN_FIRMWARE_VER);
+    error = 1;
+    goto exit;
+  }
+
+  printf("> [%04X:%04X] HID device found !\n",VID,PID);
+
+  if ( !(HidDeviceHandle = hid_open(VID, PID, NULL)) ) {
+    printf("  ** Error - Unable to open the [%04X:%04X] HID device.\n",VID,PID);
+    error = 1;
+    goto exit;
+  }
+
+  // Get info block and check if in INFO mode.
+  // Anyway, the bootloader mode will stay active.
+  if ( infoMode ) {
+    if ( ! ShowBootloaderInfo(btlVersion) )
+      error = 1 ;
+    else
+      printf("  Bootloader mode still active.\n");
+    goto exit;
   }
 
   // Open the firmware file in binary mode
@@ -456,32 +568,6 @@ int main(int argc, char *argv[]) {
   file_size = ftell(FileHandle);
   rewind(FileHandle);
   printf("> Firmware file size is %ld bytes.\n",file_size);
-
-  // Check first HID presence to avoid tries loop if already here
-  int r = HIDDeviceLookUp(false);
-  if ( r < 1 ) {
-    // Reset the board by toggling DTR
-    if ( serialPortId ) {
-      if( !SerialToggleDTR(serialPortId) != 0 ) {
-        printf("  ** Warning - Unable to open serial port [%s]\n",serialPortId);
-      }
-    }
-
-    r = HIDDeviceLookUp(true);
-    if ( r < 1 ) {
-      if ( r == -2 ) printf("\n  ** Error - Incompatible HID bootloader version.\n");
-      else printf("  ** Error - [%04X:%04X] HID device was not found.\n",VID,PID);
-      error = 1;
-      goto exit;
-    }
-  }
-
-  printf("> [%04X:%04X] HID device found !\n",VID,PID);
-  if (HidDeviceHandle == NULL) {
-    printf("  ** Error - Unable to open the [%04X:%04X] HID device.\n",VID,PID);
-    error = 1;
-    goto exit;
-  }
 
   // Set HID read  blocking
   //hid_set_nonblocking(HidDeviceHandle, 0);
@@ -514,23 +600,10 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  // Get MCU informations
-  if (infoMCU) {
-    uint8_t infoBlock[HID_RX_SIZE];
-    // Wait for info block
-    if ( ! WaitForInfoBlock(infoBlock) ) {
-        printf("\n  ** Error or timeout while waiting info block from the bootloader.\n");
-        error = 1;
-        goto exit;
-    } else {
-        uint16_t m = *(uint16_t *)&infoBlock[1];
-        uint32_t a = *(uint32_t *)&infoBlock[1 + sizeof(uint16_t)];
-        printf("  INFO - Informations reported by the MCU :\n");
-        printf("      Flash memory size  : %d K (%s density device)\n",m,
-                       (m <= 128 ? "medium":"high") );
-        printf("      Page size          : %d bytes\n", (m <= 128 ? 1024:2048) );
-        printf("      Flash base address : 0x%04X\n",a);
-    }
+  // Get info block .
+  if ( !infoMode && !ShowBootloaderInfo(btlVersion) ) {
+    error = 1 ;
+    goto exit;
   }
 
   if ( ! SendBTLCmd(CMD_START,0)  ) {
@@ -539,8 +612,9 @@ int main(int argc, char *argv[]) {
     goto exit;
   }
 
-  // Wait for an ACK because we want to secure the upload START
-  if (! WaitForACK() ) {
+  // Since the version 3.10, we need an ACK for start
+  // because we want to secure the upload
+  if ( (btlVersion >= 0X0310) && !WaitForACK() ) {
     printf("\n  ** Error or timeout while waiting START ACK from the bootloader.\n");
     error = 1;
     goto exit;
@@ -567,13 +641,18 @@ int main(int argc, char *argv[]) {
   memset(FileBlock1024, 0, 1024);
   size_t    bytesRead = fread(FileBlock1024, 1, 1024, FileHandle);
 
+  uint8_t   USB_Buffer[HID_TX_SIZE];
+
   while( bytesRead > 0 ) {
-    // Send a 1024 bytes block (even if eof).
+    // Send a 1024 bytes bloc (even if eof) of HID_TX_SIZE-1 bytes packets
     // Value are voluntarly hard coded
     for( uint16_t i = 0; i < 1024 ; i += (HID_TX_SIZE-1) ) {
 
-      uint8_t USB_Buffer[HID_TX_SIZE];
       memcpy(&USB_Buffer[1], FileBlock1024 + i, HID_TX_SIZE - 1 );
+
+      // Update the checksum
+      for ( uint8_t c = 1 ; c <= HID_TX_SIZE - 1 ; c++ )
+        cksum ^= USB_Buffer[c];
 
       // Send data block to USB
       if ( UsbWrite(USB_Buffer, HID_TX_SIZE ) < 0 ) {
@@ -596,7 +675,7 @@ int main(int argc, char *argv[]) {
 
     if ( ideEmb ) printf("%c",wfChar);
 
-    // End of block. Wait for the bootloader ACK command. 10s TIMOUT
+    // End of block. Wait for the bootloader ACK command.
     if ( ! WaitForACK() ) {
       printf("\n  ** Error or timeout while waiting ACK from the bootloader.\n");
       error = 1;
@@ -618,10 +697,19 @@ int main(int argc, char *argv[]) {
 
   // End of file. Send CMD_END to finish flashing and reboot the microcontroller...
   if (!SendBTLCmd(CMD_END,0)  ) {
-    // printf("  ** Error while sending bootloader END command.\n");
-    // error = 1;
-    // goto exit;
+    printf("\n  ** Error while sending bootloader END command.\n");
+    error = 1;
+    goto exit;
   }
+
+  // Since the version 3.10, we control the checksum
+  if ( (btlVersion >= 0X0310) ) {
+    if ( !WaitForChecksum(cksum) )
+      printf("  ** Checksum error. Firmware could be corrupted. !\n");
+    else
+      printf("  No checksum error.\n");
+  }
+
   printf("\n> Firmware flashing done !\n");
   printf("  %d sectors written",bytesSent/1024);
   if (simulFlash) printf(" (SIMULATION)");
@@ -632,6 +720,6 @@ exit:
   if ( FileHandle ) fclose( FileHandle );
   if ( HidDeviceHandle ) hid_close(HidDeviceHandle);
   hid_exit();
-  printf("> End of firmware update.\n");
+  printf("> TKG-Flash end.\n");
   return error;
 }
