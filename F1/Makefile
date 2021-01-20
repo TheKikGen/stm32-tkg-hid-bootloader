@@ -105,7 +105,7 @@ build_midiplus-smartpad: LINKER_SCRIPT=STM32F103C8T6.ld
 build_midiplus-smartpad: $(BUILD_DIR)/$(TARGET).elf $(BUILD_DIR)/$(TARGET).bin
 copy_midiplus-smartpad: $(BIN_DIR)
 	$(ECHO) "COPY    $(BIN_DIR)/tkg_hid_midiplus-smartpad.bin"
-	$(Q)$(CP) $(BUILD_DIR)/$(TARGET).bin $(BIN_DIR)/tkg_hid_midiplus-smartpad.bin
+	$(Q)$(CP) $(BUILD_DIR)/$(TARGET).bin $(BIN_DIR)/tkg_hid_midiplus_smartpad.bin
 
 build_generic-pc13: TARGETFLAGS= -DTARGET_GENERIC_F103_PC13
 build_generic-pc13: LINKER_SCRIPT=STM32F103C8T6.ld
