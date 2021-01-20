@@ -1,1 +1,1 @@
-rs232.o tkg-flash.o
+*.o

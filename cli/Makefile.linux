@@ -1,32 +1,24 @@
+###########################################
+# Simple Makefile for TKG-FLASH HID program
+#
+# LINUX PLATFORM
+#
+# TheKikGen Labs
+# 2021-01-20
+###########################################
+
 CC=gcc
 CFLAGS=-c -Wall
 LDFLAGS=
-SOURCES=main.c
-INCLUDE_DIRS=-I .
-
-ifeq ($(OS),Windows_NT)
-	SOURCES+=hid-win.c
-	SOURCES+=rs232.c
-	LIBS=-lsetupapi -lhid
-else
-	UNAME_S := $(shell uname -s)
-	ifeq ($(UNAME_S),Darwin)
-		SOURCES+=hid-mac.c
-		SOURCES+=rs232.c
-		LIBS=-framework IOKit -framework CoreFoundation
-	else
-		SOURCES+=hid-libusb.c
-		SOURCES+=rs232.c
-		LIBS=`pkg-config libusb-1.0 --libs` -lrt -lpthread
-		INCLUDE_DIRS+=`pkg-config libusb-1.0 --cflags`
-		CFLAGS+=-std=gnu99
-		LDFLAGS+=-no-pie
-		endif
-endif
+SOURCES   = tkg-flash.c rs232.c hidapi/linux/hid.c
+OBJS      = $(COBJS)
+LIBS_UDEV = `pkg-config libudev --libs` -lrt -lpthread
+LIBS      = $(LIBS_UDEV)
+INCLUDES ?= -I./hidapi/hidapi -I../hidapi `pkg-config libusb-1.0 --cflags`
 
 OBJECTS=$(SOURCES:.c=.o)
 
-EXECUTABLE = tkg-flash
+EXECUTABLE = binaries_dist/tkg-flash
 
 all: $(SOURCES) $(EXECUTABLE)
 
@@ -34,7 +26,7 @@ $(EXECUTABLE): $(OBJECTS)
 	$(CC) $(LDFLAGS) $(OBJECTS) $(LIBS) -o $@
 
 .c.o:
-	$(CC) $(CFLAGS) $(INCLUDE_DIRS) $< -o $@
+	$(CC) $(CFLAGS) $(INCLUDES) $< -o $@
 
 clean:
-	rm -f $(OBJECTS) $(EXECUTABLE) $(EXECUTABLE).exe
+	rm -f $(OBJECTS) $(EXECUTABLE)
