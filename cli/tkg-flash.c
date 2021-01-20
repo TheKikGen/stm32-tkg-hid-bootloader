@@ -351,7 +351,8 @@ static bool WaitForInfoBlock(uint8_t *infoBlock) {
 
   if ( ! SendBTLCmd(CMD_INFO,0)) return false ;
   while ( hid_read(HidDeviceHandle,infoBlock, HID_RX_SIZE) != HID_RX_SIZE
-            && infoBlock[7] != CMD_INFO ) {
+            && infoBlock[7] != CMD_INFO )
+	{
 
               Sleep_m(10) ;
   }
@@ -370,6 +371,7 @@ static bool WaitForChecksum(uint8_t ck) {
   {
               Sleep_m(10);
   }
+	//printf("Checksum F/CLI %d/%d",cmdBuff[0],ck);
   return ( cmdBuff[0] == ck );
 }
 
@@ -426,26 +428,25 @@ int main(int argc, char *argv[]) {
   bool     infoMode = false;
   uint8_t  cksum = 0;
 
+	// Build string
+	const char TimeStampedVersion[] = {
+		VERSION_MAJOR_INIT,
+		'.',
+			BUILD_YEAR_CH2,
+		BUILD_YEAR_CH3,
+			BUILD_MONTH_CH0,
+		BUILD_MONTH_CH1,
+			BUILD_DAY_CH0,
+		BUILD_DAY_CH1,
+		'.',
+		BUILD_HOUR_CH0,
+	BUILD_HOUR_CH1,
+		BUILD_MIN_CH0,
+	BUILD_MIN_CH1,
+	0
+	};
 
   setbuf(stdout, NULL);
-
-  const char TimeStampedVersion[] = {
-    VERSION_MAJOR_INIT,
-    '.',
-      BUILD_YEAR_CH2,
-    BUILD_YEAR_CH3,
-      BUILD_MONTH_CH0,
-    BUILD_MONTH_CH1,
-      BUILD_DAY_CH0,
-    BUILD_DAY_CH1,
-    '.',
-    BUILD_HOUR_CH0,
-  BUILD_HOUR_CH1,
-    BUILD_MIN_CH0,
-  BUILD_MIN_CH1,
-  0
-  };
-
 
   printf("\n+-----------------------------------------------------------------------+\n");
   printf  ("|             TKG-Flash v%d.%d STM32F103 HID Bootloader Flash Tool        |\n",
