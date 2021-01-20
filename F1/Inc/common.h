@@ -51,9 +51,9 @@ __ __| |           |  /_) |     ___|             |           |
 #ifndef COMMON_H_
 #define COMMON_H_
 
-// Firmware version : 2.4.
-#define VERSION_MAJOR 0X02
-#define VERSION_MINOR 0x40
+// Firmware version : 3.1
+#define VERSION_MAJOR 0X03
+#define VERSION_MINOR 0x10
 
 // Memory addresses common for all the STM32F103 family
 
@@ -63,7 +63,7 @@ __ __| |           |  /_) |     ___|             |           |
 /*!< SRAM base address in the alias region */
 #define SRAM_BASE_ADDR             ((uint32_t)0x20000000)
 
-/* Bootloader nb pages size in high density (2048 bytes)*/
+/* Bootloader nb pages size when in high density (2048 bytes)*/
 #define BOOTLOADER_PAGE_SIZE_H		2
 
 /* minimal SRAM size for the bootloader */
@@ -78,7 +78,7 @@ __ __| |           |  /_) |     ___|             |           |
 // Magic word to enter the bootloader
 #define MAGIC_WORD1 0x424C
 
-// macro to check if user code present in flash memeory
+// macro to check if user code present in flash memory
 #define CHECK_USER_CODE(addr) ( ( (*(volatile uint32_t *) addr ) & 0x2FFE0000 ) != SRAM_BASE )
 
 // macro to detect a high density device from the flash memory size
@@ -86,7 +86,7 @@ __ __| |           |  /_) |     ___|             |           |
 #define IS_HIGH_DENSITY ( MCU_REPORT_FLASH_MEMORY > 128)
 
 // macro to validate a flash address
-#define IS_VALID_FLASH_ADDRESS(addr) (((addr) >= 0x08000000) && ((addr) < 0x0807FFFF))
+#define IS_VALID_FLASH_ADDRESS(addr) ( ((addr) >= FLASH_BASE_ADDR) && ((addr) < (FLASH_BASE_ADDR + 0x7FFFF) ) )
 
 // uSec delay macro (not really accurate !)
 #define SLEEP_U(us) delay((uint32_t)(7*us))
