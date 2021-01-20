@@ -13,7 +13,7 @@ It was not possible (reasonable) to keep the size under the 2K, because before j
 
 The TKG-FLASH has many new features, like dump, simulation mode, progression bar, etc... and compatibilty with the STM32DUINO platform, and original HID-FLASH CLI is preserved.
 
-Latest version of the GCC ARM toolchain is recommended for building the bootloader.
+Since version 3.10, a checksum control is done at the end of the flashing process.
 
 # Entering the bootloader
 
@@ -27,21 +27,24 @@ Latest version of the GCC ARM toolchain is recommended for building the bootload
 <img alt="TKG Bootloader logic" style="border-width:0" src="https://github.com/TheKikGen/stm32-tkg-hid-bootloader/blob/master/doc/TKG-HID-BOOTLOADER%20LOGIC.png?raw=true" /></a>
 
 
-# TKG-FLASH
+# TKG-FLASH 3.1
 ``````
 +-----------------------------------------------------------------------+
-|             TKG-Flash v2.4 STM32F103 HID Bootloader Flash Tool        |
+|             TKG-Flash v3.1 STM32F103 HID Bootloader Flash Tool        |
 |                     High density device support.                      |
 |       (c) 2020 - The KikGen Labs     https://github.com/TheKikGen     |
 +-----------------------------------------------------------------------+
-Build : 2.201022.1919
+Build : 3.210120.1702
 
   Usage: tkg-flash <firmware file name> [<options>]
+         tkg-flash -info
 
   Options are :
+  -info         : get only some information from the MCU without flashing.
+
+  Flashing options :
   -d=16 -d=32   : hexa dump sectors by 16 or 32 bytes line length.
   -ide          : ide embedded, no progression bar, basic info.
-  -info         : get some information from the MCU to be flashed.
   -o=<n>        : offset the default flash start page of 1-255 page(s)
   -p=<com port> : serial com port used to toggle DTR for MCU reset.
   -sim          : flashing simulation.
@@ -50,13 +53,18 @@ Build : 2.201022.1919
   Examples :
   tkg-flash myfirmare.bin -p=COM4 -w=30
   tkg-flash myfirmare.bin -d=16 -s
+
 ``````
 
-The TKG-FLASH tool can be considered as a new version of HID-FLASH 2.2.  The following features were added :
+The TKG-FLASH tool has the following features :
 * Permanent flashing capability if com port passed in the command line
-* Waiting time parameter to wait HID device to be ready
-* Flashing simulation : same behaviour but no writes at all to the flash memory
-* Dump file feature
+* "embedded" mode when tkg-flash must be integrated in an IDE, like for example,the Arduino one.
+* Waiting time parameter to adjust the waiting time for toggling serial port and  HID device to be ready
+* Flashing simulation : allows same behaviour without writing the firmware to the flash memory
+* Dump firmware file feature
+* Page offset : flash a firmware beyond the tkg bootloader base address (first page is 4 or 2 depending on density). 
+
+The page offset permits to flash a firmware that was not linked with the tkg-hid-bootloader FLASH_BASE_ADDRESS at 0x08001000.  For example, a firmware compiled with the stm32duino bootloader will be linked with a base address at 0x08004000. So to load that firmware correctly, you can offset of 1 page for a high density device (2048 bytes per pages), or 2 for a medium density one (1024 bytes par page). 
 
 Examples :
 
@@ -64,9 +72,51 @@ To flash myfirmware.bin under windows, using COM1 DTR as reset method :
            
     tkg-flash myfirmware.bin -p=COM1
 
-To do the same under Linux :
+To do the same under Linux, with an offset of 2 pages :
 
-    tkg-flash myfirmware.bin -p=ttyACM0s
+    tkg-flash myfirmware.bin -p=ttyACM0s -o=2
+
+To get informations from a device in bootloader mode :
+
+``````
+# tkf-flash -info
+
++-----------------------------------------------------------------------+
+|             TKG-Flash v3.1 STM32F103 HID Bootloader Flash Tool        |
+|                     High density device support.                      |
+|       (c) 2020 - The KikGen Labs     https://github.com/TheKikGen     |
++-----------------------------------------------------------------------+
+Build : 3.210120.1702
+
+> Searching for [1209:BEBA] HID device...|
+> [1209:BEBA] HID device found !
+  INFO - Informations reported by the bootloader :
+      Firmware version       : 0310
+      MCU Flash memory size  : 128 K (medium density device)
+      Page size              : 1024 bytes
+      Page offset            : 4 pages
+      Flash base address     : 0x08001000
+  Bootloader mode still active.
+> TKG-Flash end.
+
+``````
+
+# How to upgrade from your current bootoader
+
+A special stm32duino sketch project can be found at https://github.com/TheKikGen/stm32-tkg-hid-bootloader/tree/master/tools/tkg_hid_btl_uploader
+
+. Load the project in the Arduino IDE
+. Specify the right uploading method in th "tools" menu, corresponding to your current bootloader
+. uncomment one of the target in the .ino source. Usually with a Bluepill STM32F103C you will choose GENERIC_PC13.
+``````
+// --- TARGETS ---
+#define GENERIC_PC13
+//#define MIDITECH_MIDIFACE
+//#define MIDIPLUS_SMART_PAD
+``````
+. The flash will start tp write the new bootloader at 0x08000000 immediatly. You can open a terminal to check the upgrade result.
+. "Double click" reset button to go directly in bootloader mode and flash your own firmware with tkgfalsh, or use "tkgflash -info" to check the firmware.
+. You can use CTRL + ALT + S to get a binary in the tkg_hid_btl_uploader directory.
 
 # Adding a new upload method to the Arduino platform (short description)
 
