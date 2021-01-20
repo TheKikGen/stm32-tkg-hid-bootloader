@@ -96,11 +96,24 @@ __ __| |           |  /_) |     ___|             |           |
 #include "libmaple/rcc.h"
 #include "libmaple/bkp.h"
 
-#include "tkg_hid_generic_pc13.bin.h"
-#include "tkg_hid_miditech4x4.bin.h"
+// --- TARGETS ---
+#define GENERIC_PC13
+//#define MIDITECH_MIDIFACE
+//#define MIDIPLUS_SMART_PAD
 
-#define MIDITECH
-//#define HIGH_DENSITY
+#if defined GENERIC_PC13
+	#include "tkg_hid_generic_pc13.bin.h"
+#elif defined MIDITECH_MIDIFACE
+	#include "tkg_hid_miditech4x4.bin.h"
+#elif defined MIDIPLUS_SMART_PAD
+	#include "tkg_hid_midiplus_smartpad.bin.h"
+#else
+	#error "no target defined"
+#endif
+
+// macro to detect a high density device from the flash memory size
+#define MCU_REPORT_FLASH_MEMORY *((uint16_t *)0x1FFFF7E0)
+#define IS_HIGH_DENSITY ( MCU_REPORT_FLASH_MEMORY > 128)
 
 #define EE_FLASH_MEMORY_BASE 0x08000000
 
@@ -119,8 +132,6 @@ typedef enum
 #define IS_FLASH_ADDRESS(ADDRESS) (((ADDRESS) >= 0x08000000) && ((ADDRESS) < 0x0807FFFF))
 #define FLASH_KEY1  0x45670123
 #define FLASH_KEY2  0xCDEF89AB
-
-uint8_t IsMidiface = 0;
 
 ///////////////////////////////////////////////////////////////////////////////
 //  FUNCTIONS PROTOTYPES
@@ -307,16 +318,11 @@ void FlashHidBTL(uint16_t pageSize) {
 	uint8_t * bloc;
 	uint16_t sz;
 
-	if ( IsMidiface ) {
-		bloc = (uint8_t *)tkg_hid_miditech4x4;
-		sz = sizeof(tkg_hid_miditech4x4);
-
-	} else {
-		bloc = (uint8_t *)tkg_hid_generic_pc13;
-		sz = sizeof(tkg_hid_generic_pc13);
-	};
+	bloc = (uint8_t *)file_array;
+	sz = sizeof(file_array);
 
 	Serial.print("HID Bootloader size is ");Serial.print(sz);Serial.println(" bytes.");
+	Serial.print("Upgrading");
 
 	uint16_t nbPageWrite = ( sz / pageSize ) + ( sz % pageSize ? 1:0);
 	uint16_t NbBytesWriteSum = 0;
@@ -329,7 +335,7 @@ void FlashHidBTL(uint16_t pageSize) {
 			NbBytesWriteSum += NbBytesWrite;
 			Serial.print("....");
 	}
-
+	Serial.println();
 	Serial.print( NbBytesWriteSum);Serial.println(" bytes written.");
 
 }
@@ -353,31 +359,10 @@ void setup()
 void loop()
 {
 
-	uint16_t pageSize = 1024;
+	Serial.println("STM32F1 TKGL HID BOOTLOADER UPGRADE BY THE KIGEN LABS");
 
-	uint8_t c =0;
-	Serial.println("STM32F103 TKG HID BOOTLOADER HIGH DENSITY SUPPORT 2.2 - UPLOADER BY THE KIGEN LABS");
-	Serial.println();
-	Serial.println("This Arduino sketch will flash the unified HID Bootloader at address 0x00000000,");
-	Serial.println("and will replace any other bootloader in place.That will free about 6144 bytes for user programs.");
-	Serial.println("NB : Applications must be compiled against the right upload method as the vector table address is 0x08001000.");
-	Serial.println();
-
-	#if defined(HIGH_DENSITY)
- #warning HIGH DENSITY
-			pageSize = 2048;
-  #endif
-
-  #if defined(MIDITECH)
-    #warning MIDITECH
-      IsMidiface = 1;
-      pageSize = 2048;
-  #endif
-
-	FlashHidBTL(pageSize);
+	FlashHidBTL(IS_HIGH_DENSITY ? 2048:1024);
 	Serial.println("Bootloader flashed.");
 	Serial.println("Please reset the board.");
 	while(1);
 }
-
-
