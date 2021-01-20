@@ -24,30 +24,34 @@
 
 void FLASH_WritePage(uint16_t *page, uint16_t *data, uint16_t size)
 {
+	FLASH_WAIT_COMPLETE;
 
-	while (READ_BIT(FLASH->SR, FLASH_SR_BSY)) ;
+	// Unlock Flash with magic keys
+	// If already unlocked, do nothing
 
-	/* Unlock Flash with magic keys */
 	if ( READ_BIT(FLASH->CR, FLASH_CR_LOCK) ) {
 		WRITE_REG(FLASH->KEYR, FLASH_KEY1);
 		WRITE_REG(FLASH->KEYR, FLASH_KEY2);
 	}
 
+	FLASH_WAIT_COMPLETE;
+
 	/* Format page */
 	SET_BIT(FLASH->CR, FLASH_CR_PER);
 	WRITE_REG(FLASH->AR, (uint32_t) page);
 	SET_BIT(FLASH->CR, FLASH_CR_STRT);
-	while (READ_BIT(FLASH->SR, FLASH_SR_BSY)) ;
+
+	FLASH_WAIT_COMPLETE;
+
 	CLEAR_BIT(FLASH->CR, FLASH_CR_PER);
 
 	/* Write page data */
 	SET_BIT(FLASH->CR, FLASH_CR_PG);
 	for (uint16_t i = 0; i < size; i++) {
 		page[i] = data[i];
-		while (READ_BIT(FLASH->SR, FLASH_SR_BSY)) ;
+		FLASH_WAIT_COMPLETE;
 	}
 	CLEAR_BIT(FLASH->CR, FLASH_CR_PG);
 
-	/* Lock Flash */
-	//SET_BIT(FLASH->CR, FLASH_CR_LOCK);
+	FLASH_LOCK;
 }

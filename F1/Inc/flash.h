@@ -21,6 +21,12 @@
 #ifndef FLASH_H_
 #define FLASH_H_
 
+// Lock flash
+#define FLASH_LOCK SET_BIT(FLASH->CR, FLASH_CR_LOCK)
+
+// Wait for operation complete
+#define FLASH_WAIT_COMPLETE while (READ_BIT(FLASH->SR, FLASH_SR_BSY))
+
 void FLASH_WritePage(uint16_t *page, uint16_t *data, uint16_t size);
 
 #endif /* FLASH_H_ */
