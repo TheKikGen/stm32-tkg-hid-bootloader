@@ -203,7 +203,7 @@ void Reset_Handler(void)
 					LED1_OFF;	SLEEP_M(20);
 			}
 
-			while (BootloaderState != BTL_END ) ;
+			while (BootloaderState != BTL_END ) SLEEP_M(20);
 
 			USB_Shutdown();
 			SLEEP_M(10);
