@@ -334,8 +334,9 @@ static void HIDUSB_HandleData(uint8_t *data)
 	// Start uploading firmware
 	else if ( BootloaderState == BTL_STARTED ) {
 
-		// Did we received the last block?
+		// End of file ?
 		if ( cmd == CMD_END ) {
+			// Do we have a pending page to write ?
 			if (CurrentPageBytesOffset) writePage = true;
 		}
 		else {
@@ -376,9 +377,9 @@ static void HIDUSB_HandleData(uint8_t *data)
 			commandData[0] = cksum;
 			commandData[7] = CMD_END ;
 			USB_SendData(ENDP1, (uint16_t *)commandData,MAX_PACKET_SIZE);
-			// End fo flashing will reset, so must wait a while
-			// to let time to the last tranfer
-			SLEEP_M(100);
+			// End of flashing will reset, so we must wait a while
+			// and let time to the last tranfer
+			SLEEP_S(2);
 			BootloaderState = BTL_END;
 		}
 
@@ -410,6 +411,7 @@ void USB_Reset(void)
 	CurrentPacketOffset = 0;
 	CurrentPageBytesOffset   = 0;
 	CurrentPage = FirstUserPage;
+	cksum = 0;
 
 	/* Set buffer descriptor table offset in PMA memory */
 	WRITE_REG(*BTABLE, BTABLE_OFFSET);
