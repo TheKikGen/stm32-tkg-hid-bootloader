@@ -57,9 +57,8 @@ __ __| |           |  /_) |     ___|             |           |
 #include "usb.h"
 #include "hid.h"
 
-#define VID 0x09,0x12		         // idVendor 0x1209
-#define PID 0xBA,0xBE		         // idProduct 0xBEFA
-#define FIRMWARE_VERSION 0x00,3	 // Firmware version.
+#define VID 0x09,0x12		     // idVendor 0x1209
+#define PID 0xBA,0xBE		     // idProduct 0xBEFA
 
 /* This should be <= MAX_EP_NUM defined in usb.h */
 #define EP_NUM 			2
@@ -97,6 +96,9 @@ static uint8_t PageData[2048];
 /* USB buffer */
 static uint8_t USB_Buffer[MAX_BUFFER_SIZE];
 
+/* Checksum */
+static uint8_t cksum = 0;
+
 /* Current page number (starts right after bootloader's end) */
 static volatile uint8_t CurrentPage;
 
@@ -123,7 +125,8 @@ static const uint8_t USB_DeviceDescriptor[] = {
 	MAX_PACKET_SIZE,	// bMaxPacketSize0 8
 	VID,		  // idVendor (2 bytes)
 	PID,		  // idProduct (2 bytes)
-	FIRMWARE_VERSION,		// bcdDevice . Version.
+	VERSION_MINOR, // bcdDevice . Version.
+	VERSION_MAJOR, // bcdDevice . Version.
 	0x01,			// iManufacturer (String Index)
 	0x02,			// iProduct (String Index)
 	0x00,			// iSerialNumber (String Index)
@@ -261,6 +264,7 @@ static BTLCommand_t HIDUSB_PacketIsCommand(void) {
 	}
 	return cmd;
 }
+
 ////////////////////////////////////////////////////////////////////////////////
 // USB ISR !!!  DATA HANDLER
 ////////////////////////////////////////////////////////////////////////////////
@@ -278,24 +282,23 @@ static void HIDUSB_HandleData(uint8_t *data)
 	CurrentPacketOffset = 0;
 	uint8_t cmd  = HIDUSB_PacketIsCommand();
 
+	// Remember that BootloaderState is checked in the main loop
 	if ( BootloaderState == BTL_WAITING ) {
+
 		// Send some info about the MCU to the CLI
 		if ( cmd == CMD_INFO ) {
-			  uint8_t commandData[MAX_PACKET_SIZE]; // 8 bytes max
-				void * pCmdData = (void *) &commandData[1];
-				memset(commandData, 0, MAX_PACKET_SIZE);
-
-				memcpy(pCmdData,(void*)&(MCU_REPORT_FLASH_MEMORY), sizeof(uint16_t));
-				pCmdData += sizeof(uint16_t); // 2 bytes
-				uint32_t a = FLASH_BASE_ADDR + CurrentPage * PageSize ;
-				memcpy(pCmdData, (void*)&a,sizeof(uint32_t) ); //4 bytes
-				commandData[7] = CMD_INFO ;
-				USB_SendData(ENDP1, (uint16_t *)commandData,MAX_PACKET_SIZE);
+			uint8_t commandData[MAX_PACKET_SIZE]; // 8 bytes max
+			memset(commandData, 0, MAX_PACKET_SIZE);
+			// Flash memory size reported by the MCU (2 bytes) [0-1]
+			memcpy(commandData,(void*)&(MCU_REPORT_FLASH_MEMORY), sizeof(uint16_t));
+			// Flash page offset 1 byte [2]
+			commandData[sizeof(uint16_t)] = CurrentPage;
+			commandData[7] = CMD_INFO ;
+			USB_SendData(ENDP1, (uint16_t *)commandData,MAX_PACKET_SIZE);
 		}
 
 		// Simulation mode with an ACK reply to secure the mode
-		else
-		if ( cmd == CMD_SIMUL ) {
+		else if ( cmd == CMD_SIMUL ) {
 				Simul = true;
 				USB_SendData(ENDP1, (uint16_t *) CMD_SIGN, MAX_PACKET_SIZE);
 		}
@@ -306,8 +309,7 @@ static void HIDUSB_HandleData(uint8_t *data)
 		// to add an offset of 2 HD pages or 4 MD pages. The bootloader will make
 		// a copy of the firmware first page at the usual flash address to allow the
 		// correct loading of vector table, whatever the offset is.
-		else
-		if ( cmd == CMD_PAGE_OFFSET ) {
+		else if ( cmd == CMD_PAGE_OFFSET ) {
 				uint8_t offset = USB_Buffer[MAX_PACKET_SIZE];
 				if ( offset != 0 ) {
 					uint32_t a = FLASH_BASE_ADDR + (CurrentPage + offset) * PageSize;
@@ -317,25 +319,24 @@ static void HIDUSB_HandleData(uint8_t *data)
 					}
 				}
 		}
-		else
-		if ( cmd == CMD_START ) {
-			BootloaderState = BTL_STARTED;
+
+		// START Command
+		else if ( cmd == CMD_START ) {
+			// Since verson 0X0310, the bootloader sends an ACK before starting
+			// for more reliability
 			USB_SendData(ENDP1, (uint16_t *) CMD_SIGN, MAX_PACKET_SIZE);
+			BootloaderState = BTL_STARTED;
 		}
 
-
 		LED1_OFF;
-		return;
 	}
-	else
 
 	// Start uploading firmware
-	if ( BootloaderState == BTL_STARTED ) {
+	else if ( BootloaderState == BTL_STARTED ) {
 
 		// Did we received the last block?
 		if ( cmd == CMD_END ) {
 			if (CurrentPageBytesOffset) writePage = true;
-			BootloaderState = BTL_END;
 		}
 		else {
 			memcpy(PageData + CurrentPageBytesOffset, USB_Buffer, MAX_BUFFER_SIZE);
@@ -351,22 +352,38 @@ static void HIDUSB_HandleData(uint8_t *data)
 					if ( PageOffset > 0 ) {
 						FLASH_WritePage((uint16_t *)(FLASH_BASE_ADDR + FirstUserPage * PageSize),
 						 				(uint16_t *) PageData, 8 / 2);
-						//SLEEP_M(1);
 						PageOffset = 0;
 					}
 
 					// Flash the page at the required address
 					FLASH_WritePage((uint16_t *)(FLASH_BASE_ADDR + CurrentPage * PageSize),
 					 				(uint16_t *) PageData, CurrentPageBytesOffset / 2);
-					//SLEEP_M(1);
 				}
+
+				// Update the checksum
+				for ( uint16_t c = 0 ; c < CurrentPageBytesOffset ; c++ )
+					cksum ^= PageData[c];
+
 				CurrentPage++;
 				CurrentPageBytesOffset = 0;
 				writePage = false;
 		}
 
+		// If finished, send an END ACK containing the checksum
+		if ( cmd == CMD_END ) {
+			uint8_t commandData[MAX_PACKET_SIZE]; // 8 bytes max
+			memset(commandData, 0, MAX_PACKET_SIZE);
+			commandData[0] = cksum;
+			commandData[7] = CMD_END ;
+			USB_SendData(ENDP1, (uint16_t *)commandData,MAX_PACKET_SIZE);
+			// End fo flashing will reset, so must wait a while
+			// to let time to the last tranfer
+			SLEEP_M(100);
+			BootloaderState = BTL_END;
+		}
+
 		// Send block ACK (at the end of all activities)
-		if ( CurrentPageBytesOffset % 1024 == 0) {
+		else if ( CurrentPageBytesOffset % 1024 == 0) {
 				LED1_OFF;
 				USB_SendData(ENDP1, (uint16_t *) CMD_SIGN, MAX_PACKET_SIZE);
 		}
