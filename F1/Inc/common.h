@@ -48,9 +48,12 @@ __ __| |           |  /_) |     ___|             |           |
 
 */
 
-
 #ifndef COMMON_H_
 #define COMMON_H_
+
+// Firmware version : 2.4.
+#define VERSION_MAJOR 0X02
+#define VERSION_MINOR 0x40
 
 // Memory addresses common for all the STM32F103 family
 
