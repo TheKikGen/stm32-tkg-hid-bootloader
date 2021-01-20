@@ -125,8 +125,8 @@ static const uint8_t USB_DeviceDescriptor[] = {
 	MAX_PACKET_SIZE,	// bMaxPacketSize0 8
 	VID,		  // idVendor (2 bytes)
 	PID,		  // idProduct (2 bytes)
-	VERSION_MINOR, // bcdDevice . Version.
-	VERSION_MAJOR, // bcdDevice . Version.
+	VERSION_MINOR, // bcdDevice . Version is read by cli.
+	VERSION_MAJOR, // bcdDevice .
 	0x01,			// iManufacturer (String Index)
 	0x02,			// iProduct (String Index)
 	0x00,			// iSerialNumber (String Index)
