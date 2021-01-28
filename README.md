@@ -122,11 +122,12 @@ Upgrading............
 3044 bytes written.
 Bootloader flashed.
 Please reset the board.
+``````
+
 * "Double click" reset button to go directly in bootloader mode and flash your own firmware with tkg-flash
 * You can use "tkg-flash -info" to check the current bootloader firmware.
 * You can also use CTRL + ALT + S to get a binary in the tkg_hid_btl_uploader directory.
 
-``````
 # Arduino IDE integration
 
 Quit Arduino IDE if active.
