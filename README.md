@@ -56,14 +56,14 @@ Build : 3.210120.1702
 ``````
 
 The TKG-FLASH tool has the following features :
-* Permanent flashing capability if com port passed in the command line
-* "embedded" mode when tkg-flash must be integrated in an IDE, like for example,the Arduino one.
-* Waiting time parameter to adjust the waiting time for toggling serial port and  HID device to be ready
-* Flashing simulation : allows same behaviour without writing the firmware to the flash memory
+* "DTR reset" capability if a com port is passed in the command line with the "-p" option
+* "embedded" mode, less verbose, when tkg-flash must be integrated in the Arduino IDE (see below).
+* Waiting time parameter to adjust the waiting time for toggling DTR serial port and  HID device to be ready (10s default)
+* Flashing simulation allowing the exact same behaviour but without writing the firmware to the flash memory
 * Dump firmware file feature
-* Page offset : flash a firmware beyond the tkg bootloader base address (first page is 4 or 2 depending on density). 
+* Page offset parameter to change the jump address. 
 
-The page offset permits to flash a firmware that was not linked with the tkg-hid-bootloader FLASH_BASE_ADDRESS at 0x08001000.  For example, a firmware compiled with the stm32duino bootloader will be linked with a base address at 0x08004000. So to load that firmware correctly, you can offset of 1 page for a high density device (2048 bytes per pages), or 2 for a medium density one (1024 bytes par page). 
+The page offset allows you to flash a firmware that was not linked with the tkg-hid-bootloader FLASH_BASE_ADDRESS at 0x08002000.  For example, a firmware compiled with the stm32duino bootloader upload method int eh Arduino IDE will be linked with a base address at 0x08004000. So to load that firmware correctly, you can offset of 1 page for a high density device (2048 bytes per pages), or 2 for a medium density one (1024 bytes par page). 
 
 Examples :
 
