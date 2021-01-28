@@ -3,7 +3,9 @@ https://github.com/TheKikGen/stm32-tkg-hid-bootloader/releases
 
 # STM32F10x TKG-HID-BOOTLOADER
 
-This is a HID (Human Interface Device) driverless booloader for the STM32F10x family line, including the famous Bluepill.  It was inspired by  https://github.com/Serasidis/STM32_HID_Bootloader from Vassilis Serasidis (respect to him !), but is not compatible anymore due to a lot of enhancements, code optimizations and bug corrections.
+This is a HID (Human Interface Device) driverless booloader for the STM32F10x family line, including the famous Bluepill.  It was inspired by the original project  https://github.com/bootsector/stm32-hid-bootloader by bootsector, but also by  https://github.com/Serasidis/STM32_HID_Bootloader from Vassilis Serasidis.
+
+However this bootloader is not compatible due to a lot of enhancements, code optimizations and bug corrections.
 
 The bootloder **supports transparently low-medium and high density devices without recompilation**. 
 The tkg-hid-bootloader doesn't use any ST libraries, but only CMSIS SDK. So, its size is under 4 Kbytes (2 high density pages), allowing more space for user programs (user flash memory starts at 0x08001000).  
