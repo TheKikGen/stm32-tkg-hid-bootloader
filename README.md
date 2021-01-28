@@ -175,6 +175,8 @@ tools.tkg_hid_upload.path={runtime.hardware.path}/tools/win
 tools.tkg_hid_upload.path.macosx={runtime.hardware.path}/tools/macosx
 tools.tkg_hid_upload.path.linux={runtime.hardware.path}/tools/linux
 tools.tkg_hid_upload.path.linux64={runtime.hardware.path}/tools/linux64
+tools.tkg_hid_upload.upload.params.verbose=-d
+tools.tkg_hid_upload.upload.params.quiet=n
 tools.tkg_hid_upload.upload.pattern="{path}/{cmd}" "{build.path}/{build.project_name}.bin" -p={serial.port.file} -w=15 -ide
 ``````
 and copy the tkg-flash tool in the Arduino\hardware\Arduino_STM32\tool\(your platform).  Under Linux, you probaly need to chown +x the tkg-flash binary.
