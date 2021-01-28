@@ -6,9 +6,9 @@ https://github.com/TheKikGen/stm32-tkg-hid-bootloader/releases
 This is a HID (Human Interface Device) driverless booloader for the STM32F10x family line, including the famous Bluepill.  It was inspired by  https://github.com/Serasidis/STM32_HID_Bootloader from Vassilis Serasidis (respect to him !), but is not compatible anymore due to a lot of enhancements, code optimizations and bug corrections.
 
 The bootloder **supports transparently low-medium and high density devices without recompilation**. 
-The tkg-hid-bootloader doesn't use any ST libraries, but only CMSIS SDK. So, its size is under 4 Kbytes, allowing more space for user programs (user flash memory starts at 0x08001000).  
+The tkg-hid-bootloader doesn't use any ST libraries, but only CMSIS SDK. So, its size is under 4 Kbytes (2 high density pages), allowing more space for user programs (user flash memory starts at 0x08001000).  
 
-It was not possible (reasonable) to keep the size under the 2K ( 1 HD flash page) because before jumping to the user application, the bootloader must ensure that the current state of the MCU is correctly initialized. Depending on your own hardware, and GPIO settings, the size can vary, and we can't change everytime the "rom start" address in the linking process. So 4K is a good compromize between size and code quality, and will let room for new enhancements.
+It was not possible (reasonable) to keep the size under the 2K ( 1 HD flash page) because before jumping to the user application, the bootloader must ensure that the current state of the MCU is correctly initialized. Depending on your own hardware, and GPIO settings, that size can vary, and we can't change everytime the "rom start" address in the linking process. So 4K is a good compromize between size and code quality, and will let room for new enhancements.
 
 The TKG-FLASH has many new features, like info, dump, simulation mode, progression bar,compatibilty with the STM32DUINO platform, and can be easily integrated in the Arduino IDE
 
@@ -63,7 +63,7 @@ The TKG-FLASH tool has the following features :
 * Dump firmware file feature
 * Page offset parameter to change the jump address. 
 
-The page offset allows you to flash a firmware that was not linked with the tkg-hid-bootloader FLASH_BASE_ADDRESS at 0x08002000.  For example, a firmware compiled with the stm32duino bootloader upload method int eh Arduino IDE will be linked with a base address at 0x08004000. So to load that firmware correctly, you can offset of 1 page for a high density device (2048 bytes per pages), or 2 for a medium density one (1024 bytes par page). 
+The page offset allows you to flash a firmware that was not linked with the tkg-hid-bootloader FLASH_BASE_ADDRESS at 0x08001000.  For example, a firmware compiled with the stm32duino bootloader upload method will be linked with a base address at 0x08002000. So to make the bootloader to load that firmware at the right address, you can offset of 2 pages for a high density device (2048 * 2 =  0x1000 bytes per pages), or 4 for a medium density one ( 4 x 1024 = 0x1000 bytes par page). 
 
 Examples :
 
@@ -131,7 +131,7 @@ genericSTM32F103C.menu.upload_method.HIDUploadMethod2K.build.upload_flags=-DSERI
 genericSTM32F103C.menu.upload_method.HIDUploadMethod2K.build.vect=VECT_TAB_ADDR=0x8001000
 genericSTM32F103C.menu.upload_method.HIDUploadMethod2K.build.ldscript=ld/hid_bootloader_tkg_cb.ld
 ``````
-You must also edit the linker script file mentioned in the upload method (ex above is hid_bootloader_tkg_cb.ld) in the (...)\STM32F1\variants\generic_stm32f103c\ld and adjust the ram and rom origin and lengths. Ram origin start at 0x20000000. The length is the RAM size of your MCU (20K for the STM32103CB). Rom origin is the flash memory available , starts at 0x08000000 + TKG bootloader size (4K = 0x1000).  The flash memory size is the MCU one minus the TKG bootloader size. 
+You must also edit the linker script file mentioned in the upload method (ex above is hid_bootloader_tkg_cb.ld) in the (...)\STM32F1\variants\generic_stm32f103c\ld and adjust the ram and rom origin and lengths. Ram origin start at 0x20000000. The length is the RAM size of your MCU (20K for the STM32103CB). Rom origin is the flash memory available , starts at 0x08000000 + TKG bootloader size (4K = 0x2000).  The flash memory size is the MCU one minus the TKG bootloader size. 
 
 ``````
 MEMORY
