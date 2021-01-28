@@ -17,7 +17,7 @@ Since version 3.10, a checksum control is done at the end of the flashing proces
 # Entering the bootloader
 
 * "Double push" on the reset button
-* Automatic when flashing with TKG-FLASH if the right com port is given to toggle DTR (not always reliable)
+* "DTR reset" method when flashing with TKG-FLASH if the right com port is given to toggle DTR (not always reliable)
 * BOOT1 set to HIGH (permanent with jumper set fro ultimate case !)
 * Writing the value **0x424C** in the DR10 backup register (ex : from your own firmware before rebooting) 
 * A START command from TKG-Flash tool
