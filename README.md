@@ -8,7 +8,7 @@ This is a HID (Human Interface Device) driverless booloader for the STM32F10x fa
 The bootloder **supports transparently low-medium and high density devices without recompilation**. 
 The tkg-hid-bootloader doesn't use any ST libraries, but only CMSIS SDK. So, its size is under 4 Kbytes, allowing more space for user programs (user flash memory starts at 0x08001000).  
 
-It was not possible (reasonable) to keep the size under the 2K ( 1 HD flash page) because before jumping to the user application, the bootloader must ensure that the current state of the MCU is correctly initialized. Depending on your own hardware, and GPIO settings, the size can vary, and we can't change everytime the "rom start" address in the linking process. So 4K is a good compromize between size and code quality, and will let room for new features !
+It was not possible (reasonable) to keep the size under the 2K ( 1 HD flash page) because before jumping to the user application, the bootloader must ensure that the current state of the MCU is correctly initialized. Depending on your own hardware, and GPIO settings, the size can vary, and we can't change everytime the "rom start" address in the linking process. So 4K is a good compromize between size and code quality, and will let room for new enhancements.
 
 The TKG-FLASH has many new features, like info, dump, simulation mode, progression bar,compatibilty with the STM32DUINO platform, and can be easily integrated in the Arduino IDE
 
