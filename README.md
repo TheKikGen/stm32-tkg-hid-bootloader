@@ -123,21 +123,19 @@ A special stm32duino sketch project can be found at https://github.com/TheKikGen
 
 Quit Arduino IDE if active.
 
-First, to add a new upload method in the STM32F1 boards, you need to modify the boards.xt usally located in your Arduino installation directory at Arduino\hardware\Arduino_STM32\STM32F1.  
+First, to add a new upload method in the STM32F1 boards, you need to modify the boards.xt usally located in your Arduino installation directory at Arduino\hardware\Arduino_STM32\STM32F1. Make a backup copy before editing the file : 
 
-Search the section "###################### Generic STM32F103C ########################################" in the board.txt file, then the sub section "#---------------------------- UPLOAD METHODS ---------------------------"
-
-Add the following lines at the last part of the upload section, to create a new "TKG-HID" upload method that will be shown in the IDE menu :
+Search the section "## Generic STM32F103C ##" in the board.txt file, then the sub section "#-- UPLOAD METHODS --", and add the following lines at the last part of the upload section, to create a new "TKG-HID" upload method that will be shown in the IDE menu :
 ``````
 genericSTM32F103C.menu.upload_method.TKG-HIDUploadMethod=TKG HID bootloader 3.1
 genericSTM32F103C.menu.upload_method.TKG-HIDUploadMethod.upload.tool=tkg-flash
 genericSTM32F103C.menu.upload_method.TKG-HIDUploadMethod.build.upload_flags=-DSERIAL_USB -DGENERIC_BOOTLOADER
 genericSTM32F103C.menu.upload_method.TKG-HIDUploadMethod.build.vect=VECT_TAB_ADDR=0x8001000
-genericSTM32F103C.menu.upload_method.TKG-HIDUploadMethod.build.ldscript=ld/tkg_hid_bootloader_cb.ld
+genericSTM32F103C.menu.upload_method.TKG-HIDUploadMethod.build.ldscript=ld/tkg_hid_bootloader.ld
 ``````
 Save and close boards.txt file.
 
-Create now a new linker script file as mentioned in the above upload method, named "tkg_hid_bootloader_cb.ld" in the directory STM32F1/variants/generic_stm32f103c/ld/ :
+Create now a new linker script file for your board, as mentioned in the above upload method, named "tkg_hid_bootloader.ld" in the directory STM32F1/variants/generic_stm32f103c/ld/ :
 ``````
 /*
  * TKG-HID FLASH BUILD LINKER SCRIPT - V3.1
@@ -165,20 +163,20 @@ The ram and rom origin and lengths are adjusted to match the uC/board specificat
 - Ram origin starts at 0x20000000. The length is the RAM size of your MCU (20K for the STM32103C8/CB).   
 - Program origin in rom starts at 0x08000000 + TKG bootloader size (4K = 0x1000). The LENGTH is the flash memory size of the MCU minus 4k (bootloader size). 
 
-You must then add an upload method in platform.txt :
+You must then add a new upload method in Arduino/hardware/Arduino_STM32/STM32F1/platform.txt (make a backup copy before editing the file) in the "# Uploader tools
+#" section :
 
-    # TKG-HID upload 2.2.2
-    tools.tkg_hid_upload.cmd=tkg_hid_upload
-    tools.tkg_hid_upload.cmd.windows=tkg-flash.exe
-    tools.tkg_hid_upload.cmd.macosx=tkg_flash
-    tools.tkg_hid_upload.path={runtime.hardware.path}/tools/win
-    tools.tkg_hid_upload.path.macosx={runtime.hardware.path}/tools/macosx
-    tools.tkg_hid_upload.path.linux={runtime.hardware.path}/tools/linux
-    tools.tkg_hid_upload.path.linux64={runtime.hardware.path}/tools/linux64
-    tools.tkg_hid_upload.upload.params.verbose=-d
-    tools.tkg_hid_upload.upload.params.quiet=n
-    tools.tkg_hid_upload.upload.pattern="{path}/{cmd}" "{build.path}/{build.project_name}.bin" -p={serial.port.file} -ide
-
-and copy the tkg-flash tool in the Arduino\hardware\Arduino_STM32\tool\win .
+``````
+# TKG-HID upload 3.1
+tools.tkg_hid_upload.cmd=tkg-flash
+tools.tkg_hid_upload.cmd.windows=tkg-flash.exe
+tools.tkg_hid_upload.cmd.macosx=tkg-flash
+tools.tkg_hid_upload.path={runtime.hardware.path}/tools/win
+tools.tkg_hid_upload.path.macosx={runtime.hardware.path}/tools/macosx
+tools.tkg_hid_upload.path.linux={runtime.hardware.path}/tools/linux
+tools.tkg_hid_upload.path.linux64={runtime.hardware.path}/tools/linux64
+tools.tkg_hid_upload.upload.pattern="{path}/{cmd}" "{build.path}/{build.project_name}.bin" -p={serial.port.file} -w=15 -ide
+``````
+and copy the tkg-flash tool in the Arduino\hardware\Arduino_STM32\tool\(your platform).  Under Linux, you probaly need to chown +x the tkg-flash binary.
 You need to restart the Arduino IDE to see your changes.
 
