@@ -114,11 +114,19 @@ A special stm32duino sketch project can be found at https://github.com/TheKikGen
 //#define MIDIPLUS_SMART_PAD
 ``````
 * The flash operation will start and the new bootloader will be written at 0x08000000.
-* You can open a serial terminal to check eventual error messages.
+* You can open a serial terminal to get a small report and check eventual error messages.
+``````
+STM32F1 TKGL HID BOOTLOADER UPGRADE BY THE KIGEN LABS
+HID Bootloader size is 3044 bytes.
+Upgrading............
+3044 bytes written.
+Bootloader flashed.
+Please reset the board.
 * "Double click" reset button to go directly in bootloader mode and flash your own firmware with tkg-flash
 * You can use "tkg-flash -info" to check the current bootloader firmware.
 * You can also use CTRL + ALT + S to get a binary in the tkg_hid_btl_uploader directory.
 
+``````
 # Arduino IDE integration
 
 Quit Arduino IDE if active.
