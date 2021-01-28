@@ -179,6 +179,17 @@ tools.tkg_hid_upload.upload.params.verbose=-d
 tools.tkg_hid_upload.upload.params.quiet=n
 tools.tkg_hid_upload.upload.pattern="{path}/{cmd}" "{build.path}/{build.project_name}.bin" -p={serial.port.file} -w=15 -ide
 ``````
-and copy the tkg-flash tool in the Arduino\hardware\Arduino_STM32\tool\(your platform).  Under Linux, you probaly need to chown +x the tkg-flash binary.
+and copy the tkg-flash tool in the Arduino\hardware\Arduino_STM32\tool\(your platform).   
+
+Under Linux, and probably Mac-OSX, you probaly need to :
+- chown +x the tkg-flash binary
+- add a rules in /etc/udev/rules.d/ to allow the Arduino IDE to see the HID device, containing the follwing line :
+
+      SUBSYSTEMS=="usb", ATTRS{idVendor}=="1209", ATTRS{idProduct}=="beba", MODE:="0666"
+      
+- Unplug your device, and restart udev administration service with a "sudo udevadm control --reload-rules
+" command line
+
+
 You need to restart the Arduino IDE to see your changes.
 
