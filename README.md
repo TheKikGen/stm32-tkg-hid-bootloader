@@ -128,7 +128,7 @@ First, to add a new upload method in the STM32F1 boards, you need to modify the 
 Search the section "## Generic STM32F103C ##" in the board.txt file, then the sub section "#-- UPLOAD METHODS --", and add the following lines at the last part of the upload section, to create a new "TKG-HID" upload method that will be shown in the IDE menu :
 ``````
 genericSTM32F103C.menu.upload_method.TKG-HIDUploadMethod=TKG HID bootloader 3.1
-genericSTM32F103C.menu.upload_method.TKG-HIDUploadMethod.upload.tool=tkg-flash
+genericSTM32F103C.menu.upload_method.TKG-HIDUploadMethod.upload.tool=tkg_hid_upload
 genericSTM32F103C.menu.upload_method.TKG-HIDUploadMethod.build.upload_flags=-DSERIAL_USB -DGENERIC_BOOTLOADER
 genericSTM32F103C.menu.upload_method.TKG-HIDUploadMethod.build.vect=VECT_TAB_ADDR=0x8001000
 genericSTM32F103C.menu.upload_method.TKG-HIDUploadMethod.build.ldscript=ld/tkg_hid_bootloader.ld
