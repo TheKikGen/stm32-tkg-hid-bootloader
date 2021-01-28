@@ -119,24 +119,35 @@ A special stm32duino sketch project can be found at https://github.com/TheKikGen
 * You can use "tkg-flash -info" to check the current bootloader firmware.
 * You can also use CTRL + ALT + S to get a binary in the tkg_hid_btl_uploader directory.
 
-# Adding a new upload method to the Arduino platform (short description)
+# Arduino IDE integration
 
-First, you must add a new upload method in board.txt (usually located at ..\Arduino\hardware\Arduino_STM32\STM32F1
+Quit Arduino IDE if active.
 
-Exemple for a STM32103C Bluepill :
-``````
-genericSTM32F103C.menu.upload_method.HIDUploadMethod2K=TKG-HID bootloader
-genericSTM32F103C.menu.upload_method.HIDUploadMethod2K.upload.tool=tkg-hid
-genericSTM32F103C.menu.upload_method.HIDUploadMethod2K.build.upload_flags=-DSERIAL_USB -DGENERIC_BOOTLOADER
-genericSTM32F103C.menu.upload_method.HIDUploadMethod2K.build.vect=VECT_TAB_ADDR=0x8001000
-genericSTM32F103C.menu.upload_method.HIDUploadMethod2K.build.ldscript=ld/hid_bootloader_tkg_cb.ld
-``````
-You must also edit the linker script file mentioned in the upload method (ex above is hid_bootloader_tkg_cb.ld) in the (...)\STM32F1\variants\generic_stm32f103c\ld and adjust the ram and rom origin and lengths. Ram origin start at 0x20000000. The length is the RAM size of your MCU (20K for the STM32103CB). Rom origin is the flash memory available , starts at 0x08000000 + TKG bootloader size (4K = 0x2000).  The flash memory size is the MCU one minus the TKG bootloader size. 
+First, to add a new upload method in the STM32F1 boards, you need to modify the boards.xt usally located in your Arduino installation directory at Arduino\hardware\Arduino_STM32\STM32F1.  
 
+Search the section "###################### Generic STM32F103C ########################################" in the board.txt file, then the sub section "#---------------------------- UPLOAD METHODS ---------------------------"
+
+Add the following lines at the last part of the upload section, to create a new "TKG-HID" upload method that will be shown in the IDE menu :
 ``````
+genericSTM32F103C.menu.upload_method.TKG-HIDUploadMethod=TKG HID bootloader 3.1
+genericSTM32F103C.menu.upload_method.TKG-HIDUploadMethod.upload.tool=tkg-flash
+genericSTM32F103C.menu.upload_method.TKG-HIDUploadMethod.build.upload_flags=-DSERIAL_USB -DGENERIC_BOOTLOADER
+genericSTM32F103C.menu.upload_method.TKG-HIDUploadMethod.build.vect=VECT_TAB_ADDR=0x8001000
+genericSTM32F103C.menu.upload_method.TKG-HIDUploadMethod.build.ldscript=ld/tkg_hid_bootloader_cb.ld
+``````
+Save and close boards.txt file.
+
+Create now a new linker script file as mentioned in the above upload method, named "tkg_hid_bootloader_cb.ld" in the directory STM32F1/variants/generic_stm32f103c/ld/ :
+``````
+/*
+ * TKG-HID FLASH BUILD LINKER SCRIPT - V3.1
+ * STM32F103C8 / STM32F103CB
+ */
 MEMORY
 {
+  /* Real RAM size of the board */
   ram (rwx) : ORIGIN = 0x20000000, LENGTH = 20K
+  /* Flash RAM size of the board minus 4K */
   rom (rx)  : ORIGIN = 0x08001000, LENGTH = 124K
 }
 
@@ -149,6 +160,11 @@ REGION_ALIAS("REGION_RODATA", rom);
 /* Let common.inc handle the real work. */
 INCLUDE common.inc
 ``````
+
+The ram and rom origin and lengths are adjusted to match the uC/board specifications.   
+- Ram origin starts at 0x20000000. The length is the RAM size of your MCU (20K for the STM32103C8/CB).   
+- Program origin in rom starts at 0x08000000 + TKG bootloader size (4K = 0x1000). The LENGTH is the flash memory size of the MCU minus 4k (bootloader size). 
+
 You must then add an upload method in platform.txt :
 
     # TKG-HID upload 2.2.2
