@@ -184,15 +184,14 @@ static char HourGlass(void) {
   static char * hourGlass="|/-\\";
   static uint8_t i =0;
 
-  if ( ! hourGlass[i] ) i=0;
-  return hourGlass[i++];
+  return hourGlass[i++ % strlen(hourGlass)];
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 // Printf a char n times
 ////////////////////////////////////////////////////////////////////////////////
 static void print_str_repeat(char c, int n) {
-  for ( int i = 0; i !=n ; i++) printf("%c",c);
+  while ( n--) putchar(c);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -297,11 +296,9 @@ bool SerialToggleDTR(char *serialPort) {
 int HIDDeviceLookUp(bool oneShot) {
   struct hid_device_info *deviceInfo;
   int v = -1;
-
   // N try, more or less N sec to open the right HID device.
   for( uint8_t i = 0; i < USBTimeout ; i++ ) {
-    printf("> Searching for [%04X:%04X] HID device...",VID,PID);
-    printf("%c\r",HourGlass());
+    printf("> Searching for [%04X:%04X] HID device...%c\r",VID,PID,HourGlass());
 
     deviceInfo = hid_enumerate(VID, PID);
     if ( deviceInfo) v = deviceInfo->release_number;
@@ -333,28 +330,36 @@ static bool SendBTLCmd(BTLCommand_t cmd, uint8_t cmdData) {
 // Wait for a valid bootloader ACK command
 ////////////////////////////////////////////////////////////////////////////////
 static bool WaitForACK(void) {
-  uint8_t cmdBuff[HID_RX_SIZE];
 
-  while ( hid_read(HidDeviceHandle,cmdBuff, HID_RX_SIZE) != HID_RX_SIZE
+  uint8_t cmdBuff[HID_RX_SIZE];
+	int r = -1;
+  while ( ( r = hid_read(HidDeviceHandle,cmdBuff, HID_RX_SIZE) ) != HID_RX_SIZE
             && cmdBuff[7] != CMD_ACK )
   {
-              Sleep_m(10);
+							if ( r < 0 ) return false;
+	            Sleep_m(100);
   }
 
   return true;
 }
 
-////////////////////////////////////////////////////ac////////////////////////////
-// Wait for a valid bootloader info block command
+////////////////////////////////////////////////////////////////////////////////
+// Wait for a valid bootloader info block command and SYNC first command
 ////////////////////////////////////////////////////////////////////////////////
 static bool WaitForInfoBlock(uint8_t *infoBlock) {
 
   if ( ! SendBTLCmd(CMD_INFO,0)) return false ;
-  while ( hid_read(HidDeviceHandle,infoBlock, HID_RX_SIZE) != HID_RX_SIZE
+	int r = -1;
+	while ( ( r = hid_read(HidDeviceHandle,infoBlock, HID_RX_SIZE) ) != HID_RX_SIZE
             && infoBlock[7] != CMD_INFO )
 	{
+							if ( r < 0 ) return false;
+              Sleep_m(100) ;
+							// This line is used to synchronize cli with the bootloader as
+							// it is the first command sent...in some cases, the bootloader
+							// could miss the first one.
+							if ( ! SendBTLCmd(CMD_INFO,0)) return false ;
 
-              Sleep_m(10) ;
   }
 
   return true;
@@ -365,11 +370,12 @@ static bool WaitForInfoBlock(uint8_t *infoBlock) {
 ////////////////////////////////////////////////////////////////////////////////
 static bool WaitForChecksum(uint8_t ck) {
   uint8_t cmdBuff[HID_RX_SIZE];
-
-  while ( hid_read(HidDeviceHandle,cmdBuff, HID_RX_SIZE) != HID_RX_SIZE
+	int r = -1;
+  while ( ( r = hid_read(HidDeviceHandle,cmdBuff, HID_RX_SIZE) ) != HID_RX_SIZE
             && cmdBuff[7] != CMD_END )
   {
-              Sleep_m(10);
+							if ( r < 0 ) return false;
+	            Sleep_m(100);
   }
 	//printf("Checksum F/CLI %d/%d",cmdBuff[0],ck);
   return ( cmdBuff[0] == ck );
@@ -381,7 +387,11 @@ static bool WaitForChecksum(uint8_t ck) {
 static bool ShowBootloaderInfo(int version) {
 
   uint8_t infoBlock[HID_RX_SIZE];
-  // Wait for info blockc
+
+  // Wait for info block
+
+	printf("> Waiting for INFO block...\n");
+
   if ( ! WaitForInfoBlock(infoBlock) ) {
       printf("\n  ** Error or timeout while waiting info block from the bootloader.\n");
       return false;
@@ -546,22 +556,25 @@ int main(int argc, char *argv[]) {
     goto exit;
   }
 
-	Sleep_m(500);
-
 	// Get info block and check if in INFO mode.
-  // Anyway, the bootloader mode will stay active.
+	// The cli attempts to sync with the bootloader by resending the info
+	// command indefinitely.
+	// The bootloader doesn't reboot with -info command line option, so it is
+	// still possible to flash a firmware in a second tkg-flash run if the
+	// bootloader was effectively already in upload mode.
+
   if ( infoMode ) {
     if ( ! ShowBootloaderInfo(btlVersion) )
       error = 1 ;
     else
-      printf("  Bootloader mode still active.\n");
+      printf("  Bootloader is still active if bootloader mode was set.\n");
     goto exit;
   }
 
   // Open the firmware file in binary mode
   FileHandle = fopen(argv[1], "rb");
   if(!FileHandle) {
-    printf("  ** Error opening firmware file: %s\n", argv[1]);
+    printf("  ** Error opening firmware file: %s.\n", argv[1]);
     return error;
   }
 
@@ -569,13 +582,37 @@ int main(int argc, char *argv[]) {
   unsigned long file_size = 0;
   fseek(FileHandle, 0L, SEEK_END);
   file_size = ftell(FileHandle);
+	if( file_size < 8 ) {
+    printf("  ** Error : firmware file has a bad length.\n");
+		fclose(FileHandle);
+		error = 1;
+    return error;
+  }
+
   rewind(FileHandle);
   printf("> Firmware file size is %ld bytes.\n",file_size);
+
+	// Show some basic information about the firmware
+	uint32_t MSPAddr = 0;
+	uint32_t resetHandlerAddr =0;
+	fread(&MSPAddr, 1, sizeof(uint32_t), FileHandle);
+	fread(&resetHandlerAddr, 1, sizeof(uint32_t), FileHandle);
+	rewind(FileHandle);
+	printf("      Main stack pointer     : 0x%08X\n",MSPAddr);
+	printf("      Reset handler          : 0x%08X\n",resetHandlerAddr);
+	rewind(FileHandle);
+
 
   // Set HID read  blocking
   //hid_set_nonblocking(HidDeviceHandle, 0);
 
-  // START BOOTLOADER
+	// Get info block for ever but send error...to synchronize cli.
+  if ( !ShowBootloaderInfo(btlVersion) ) {
+    error = 1 ;
+    goto exit;
+  }
+
+	// START FLASHING
 
   printf("> Flashing firmware");
   if (simulFlash) printf(" (SIMULATION)");
@@ -601,12 +638,6 @@ int main(int argc, char *argv[]) {
       error = 1;
       goto exit;
     }
-  }
-
-  // Get info block .
-  if ( !infoMode && !ShowBootloaderInfo(btlVersion) ) {
-    error = 1 ;
-    goto exit;
   }
 
   if ( ! SendBTLCmd(CMD_START,0)  ) {
