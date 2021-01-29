@@ -14,7 +14,7 @@ It was not possible (reasonable) to keep the size under the 2K ( 1 HD flash page
 
 The TKG-FLASH has many new features, like info, dump, simulation mode, progression bar,compatibilty with the STM32DUINO platform, and can be easily integrated in the Arduino IDE
 
-Since version 3.10, a checksum control is done at the end of the flashing process.
+Since version 3.10, a xor checksum control is done at the end of the flashing process. 
 
 # Entering the bootloader
 
