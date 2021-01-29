@@ -546,7 +546,9 @@ int main(int argc, char *argv[]) {
     goto exit;
   }
 
-  // Get info block and check if in INFO mode.
+	Sleep_m(500);
+
+	// Get info block and check if in INFO mode.
   // Anyway, the bootloader mode will stay active.
   if ( infoMode ) {
     if ( ! ShowBootloaderInfo(btlVersion) )
