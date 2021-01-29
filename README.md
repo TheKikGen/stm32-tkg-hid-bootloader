@@ -3,7 +3,9 @@ https://github.com/TheKikGen/stm32-tkg-hid-bootloader/releases
 
 # STM32F10x TKG-HID-BOOTLOADER
 
-This is a HID (Human Interface Device) driverless booloader for the STM32F10x family line, including the famous Bluepill.  It was inspired by  https://github.com/Serasidis/STM32_HID_Bootloader from Vassilis Serasidis (respect to him !), but is not compatible anymore due to a lot of enhancements, code optimizations and bug corrections.
+This is a HID (Human Interface Device) driverless booloader for the STM32F10x family line, including the famous Bluepill.  It was inspired by [the original project](https://github.com/bootsector/stm32-hid-bootloader) from bootsector, but also from the derivated [HID Bootloader](https://github.com/Serasidis/STM32_HID_Bootloader) from Vassilis Serasidis.
+
+However this bootloader is not compatible anymore due to a lot of enhancements, code optimizations and bug corrections.
 
 The bootloder **supports transparently low-medium and high density devices without recompilation**. 
 The tkg-hid-bootloader doesn't use any ST libraries, but only CMSIS SDK. So, its size is under 4 Kbytes (2 high density pages), allowing more space for user programs (user flash memory starts at 0x08001000).  
@@ -12,7 +14,7 @@ It was not possible (reasonable) to keep the size under the 2K ( 1 HD flash page
 
 The TKG-FLASH has many new features, like info, dump, simulation mode, progression bar,compatibilty with the STM32DUINO platform, and can be easily integrated in the Arduino IDE
 
-Since version 3.10, a checksum control is done at the end of the flashing process.
+Since version 3.10, a xor checksum control is done at the end of the flashing process. 
 
 # Entering the bootloader
 
@@ -114,7 +116,16 @@ A special stm32duino sketch project can be found at https://github.com/TheKikGen
 //#define MIDIPLUS_SMART_PAD
 ``````
 * The flash operation will start and the new bootloader will be written at 0x08000000.
-* You can open a serial terminal to check eventual error messages.
+* You can open a serial terminal to get a small report and check eventual error messages.
+``````
+STM32F1 TKGL HID BOOTLOADER UPGRADE BY THE KIGEN LABS
+HID Bootloader size is 3044 bytes.
+Upgrading............
+3044 bytes written.
+Bootloader flashed.
+Please reset the board.
+``````
+
 * "Double click" reset button to go directly in bootloader mode and flash your own firmware with tkg-flash
 * You can use "tkg-flash -info" to check the current bootloader firmware.
 * You can also use CTRL + ALT + S to get a binary in the tkg_hid_btl_uploader directory.
@@ -123,7 +134,7 @@ A special stm32duino sketch project can be found at https://github.com/TheKikGen
 
 Quit Arduino IDE if active.
 
-First, to add a new upload method in the STM32F1 boards, you need to modify the boards.xt usally located in your Arduino installation directory at Arduino\hardware\Arduino_STM32\STM32F1. Make a backup copy before editing the file : 
+First, to add a new upload method in the STM32F1 boards, you need to modify the "boards.txt" usally located in your Arduino installation directory at "Arduino\hardware\Arduino_STM32\STM32F1". Make a backup copy before editing the file : 
 
 Search the section "## Generic STM32F103C ##" in the board.txt file, then the sub section "#-- UPLOAD METHODS --", and add the following lines at the last part of the upload section, to create a new "TKG-HID" upload method that will be shown in the IDE menu :
 ``````
@@ -135,7 +146,7 @@ genericSTM32F103C.menu.upload_method.TKG-HIDUploadMethod.build.ldscript=ld/tkg_h
 ``````
 Save and close boards.txt file.
 
-Create now a new linker script file for your board, as mentioned in the above upload method, named "tkg_hid_bootloader.ld" in the directory STM32F1/variants/generic_stm32f103c/ld/ :
+Create now a new linker script file for your board, as mentioned in the above upload method, named "tkg_hid_bootloader.ld" in the directory STM32F1/variants/generic_stm32f103c/ld/ , and copy paste the following content :
 ``````
 /*
  * TKG-HID FLASH BUILD LINKER SCRIPT - V3.1
