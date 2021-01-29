@@ -134,7 +134,7 @@ Please reset the board.
 
 Quit Arduino IDE if active.
 
-First, to add a new upload method in the STM32F1 boards, you need to modify the boards.xt usally located in your Arduino installation directory at Arduino\hardware\Arduino_STM32\STM32F1. Make a backup copy before editing the file : 
+First, to add a new upload method in the STM32F1 boards, you need to modify the "boards.txt" usally located in your Arduino installation directory at "Arduino\hardware\Arduino_STM32\STM32F1". Make a backup copy before editing the file : 
 
 Search the section "## Generic STM32F103C ##" in the board.txt file, then the sub section "#-- UPLOAD METHODS --", and add the following lines at the last part of the upload section, to create a new "TKG-HID" upload method that will be shown in the IDE menu :
 ``````
@@ -146,7 +146,7 @@ genericSTM32F103C.menu.upload_method.TKG-HIDUploadMethod.build.ldscript=ld/tkg_h
 ``````
 Save and close boards.txt file.
 
-Create now a new linker script file for your board, as mentioned in the above upload method, named "tkg_hid_bootloader.ld" in the directory STM32F1/variants/generic_stm32f103c/ld/ :
+Create now a new linker script file for your board, as mentioned in the above upload method, named "tkg_hid_bootloader.ld" in the directory STM32F1/variants/generic_stm32f103c/ld/ , and copy paste the following content :
 ``````
 /*
  * TKG-HID FLASH BUILD LINKER SCRIPT - V3.1
