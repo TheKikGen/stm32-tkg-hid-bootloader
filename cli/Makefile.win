@@ -9,6 +9,9 @@
 ###########################################
 
 CC=i686-w64-mingw32-gcc
+ifeq ($(OS),Windows_NT)
+	CC=gcc
+endif
 CFLAGS=-c -Wall
 LDFLAGS=
 SOURCES   = tkg-flash.c rs232.c hidapi/windows/hid.c
