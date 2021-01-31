@@ -203,3 +203,33 @@ Under Linux, and Mac-OSX, you probaly need to :
 
 You need to restart the Arduino IDE to see your changes.
 
+# Make an Arduino application to reboot in bootloader mode
+
+When the board is booting, the bootloader checks the value **0x424C** in the DR10 backup register to eventually enter in bootloader mode.
+To write this value from your own application, you can use the following example:  
+
+``````
+
+///////////////////////////////////////////////////////////////////////////////
+// Set magic bootloader mode
+///////////////////////////////////////////////////////////////////////////////
+void BootLoaderMode()
+{
+   // Write the Magic word bootloader
+
+   RCC_BASE->APB1ENR |=  (RCC_APB1ENR_BKPEN | RCC_APB1ENR_PWREN) ;
+   // Enable write access to the backup registers and the RTC
+   PWR_BASE->CR |= PWR_CR_DBP;
+
+   // write register
+   BKP_BASE->BOOT_BTL_REGISTER = 0x424C;
+
+   // Disable write
+   PWR_BASE->CR &= ~PWR_CR_DBP;
+   RCC_BASE->APB1ENR &=  ~(RCC_APB1ENR_BKPEN | RCC_APB1ENR_PWREN) ;
+
+   // Reset
+   nvic_sys_reset();
+}
+``````
+
