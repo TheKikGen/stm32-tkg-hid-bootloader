@@ -211,7 +211,7 @@ When the board is booting, the bootloader checks the value **0x424C** in the DR1
 To write this value from your own application, you can use the following example:  
 
 ``````
-
+ #define BOOT_BTL_REGISTER     DR10
 ///////////////////////////////////////////////////////////////////////////////
 // Set magic bootloader mode
 ///////////////////////////////////////////////////////////////////////////////
