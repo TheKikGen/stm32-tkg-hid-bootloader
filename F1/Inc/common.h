@@ -53,7 +53,7 @@ __ __| |           |  /_) |     ___|             |           |
 
 // Firmware version : 3.1
 #define VERSION_MAJOR 0X03
-#define VERSION_MINOR 0x10
+#define VERSION_MINOR 0x20
 
 // Memory addresses common for all the STM32F103 family
 

@@ -19,6 +19,8 @@
 *	by Michel Stempin <michel.stempin@wanadoo.fr>
 *	Cleanup and optimizations
 *
+* Modified by the KikGen : stabilization of USB initialization
+*
 */
 
 #include <stm32f10x.h>
