@@ -71,7 +71,7 @@ uint32_t *VectorTable[] __attribute__((section(".isr_vector"))) = {
 // Delay function. For uSec and mSec, use SLEEP_U and SLEEP_M macros
 ///////////////////////////////////////////////////////////////////////////////
 void delay(uint32_t t) {
-	for (volatile uint32_t i = 0; i !=t; i++) 	__NOP();
+	for (uint32_t i = 0; i !=t; i++) 	__NOP();
 }
 
 ///////////////////////////////////////////////////////////////////////////////

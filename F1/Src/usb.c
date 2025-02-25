@@ -81,73 +81,72 @@ void USB_SendData(uint8_t endpoint, uint16_t *data, uint16_t length)
 
 void USB_Shutdown(void)
 {
-    /* Disable USB Clock on APB1 */
-    CLEAR_BIT(RCC->APB1ENR, RCC_APB1ENR_USBEN);
+	DeviceConfigured = 0;
 
-    /* Disable USB IRQ and clear error flags */
-    NVIC_DisableIRQ(USB_LP_CAN1_RX0_IRQn);
-    WRITE_REG(*ISTR, 0);
-    DeviceConfigured = 0;
+	/* Step 1: Disable USB IRQs */
+	NVIC_DisableIRQ(USB_LP_CAN1_RX0_IRQn);
+	WRITE_REG(*ISTR, 0);
 
-    /* Turn USB Macrocell off (commented for STM32F103) */
-    // WRITE_REG(*CNTR, CNTR_FRES | CNTR_PDWN);
+	/* Step 2: Turn USB Macrocell off */
+	WRITE_REG(*CNTR, CNTR_FRES | CNTR_PDWN);
+	SLEEP_M(1);
 
-    /* Configure PA12 (DP) and PA11 (DM) as input floating */
-    MODIFY_REG(GPIOA->CRH, GPIO_CRH_CNF12 | GPIO_CRH_MODE12, GPIO_CRH_CNF12_1);
-    MODIFY_REG(GPIOA->CRH, GPIO_CRH_CNF11 | GPIO_CRH_MODE11, GPIO_CRH_CNF11_1);
+	/* Step 3 : Disable USB Clock on APB1 */
+	CLEAR_BIT(RCC->APB1ENR, RCC_APB1ENR_USBEN);
 
-    /* Removed: Sinking PA12 to GND is unnecessary and potentially harmful */
-    // WRITE_REG(GPIOA->BRR, GPIO_BRR_BR12);
+	/* Step 4: PA12 : General purpose output 50 MHz open drain */
+	SET_BIT(RCC->APB2ENR, RCC_APB2ENR_IOPAEN);
+	MODIFY_REG(GPIOA->CRH,GPIO_CRH_CNF12 | GPIO_CRH_MODE12, GPIO_CRH_CNF12_0 | GPIO_CRH_MODE12);
+	
+	/* Sinks PA12 to GND */
+	WRITE_REG(GPIOA->BRR, GPIO_BRR_BR12);
 }
 
 void USB_Init(void)
 {
 
-    // Reset RX and TX lengths for all endpoints
+    // USB devices start as not configured
+	DeviceConfigured = 0;
+
+	// Reset RX and TX lengths for all endpoints
     for (uint8_t i = 0; i < MAX_EP_NUM; i++) {
         RxTxBuffer[i].RXL = RxTxBuffer[i].TXL = 0;
     }
+ 
+	/* Step 1: Enable USB Clock */
+	SET_BIT(RCC->APB1ENR, RCC_APB1ENR_USBEN);
+    
+ 	/* Step 2: */
 
-    // Configure PA12 (DP) as alternate function push-pull
-    SET_BIT(RCC->APB2ENR, RCC_APB2ENR_IOPAEN);
-    MODIFY_REG(GPIOA->CRH, GPIO_CRH_CNF12 | GPIO_CRH_MODE12, GPIO_CRH_CNF12_0 | GPIO_CRH_MODE12_1);
+	// Configure PA12 (DP) as alternate function push-pull
+	SET_BIT(RCC->APB2ENR, RCC_APB2ENR_IOPAEN);
+	MODIFY_REG(GPIOA->CRH, GPIO_CRH_CNF12 | GPIO_CRH_MODE12, GPIO_CRH_CNF12_0 | GPIO_CRH_MODE12_1);
 
-    // Configure PA11 (DM) as input floating
-    MODIFY_REG(GPIOA->CRH, GPIO_CRH_CNF11 | GPIO_CRH_MODE11, GPIO_CRH_CNF11_1);
+	// Configure PA11 (DM) as input floating
+	MODIFY_REG(GPIOA->CRH, GPIO_CRH_CNF11 | GPIO_CRH_MODE11, GPIO_CRH_CNF11_1);
 
-    // USB devices start as not configured
-    DeviceConfigured = 0;
+    /* Step 3: Reset USB Peripheral */
+    
+    WRITE_REG(*CNTR, CNTR_FRES); // Force Reset
+	SLEEP_M(1);
+    WRITE_REG(*CNTR, 0); // Exit Reset State
 
-    // Enable USB clock
-    SET_BIT(RCC->APB1ENR, RCC_APB1ENR_USBEN);
+	/* Wait until RESET flag = 1 (polling) */
+	while (!READ_BIT(*ISTR, ISTR_RESET)) {
+		;
+	}
 
-    // Enable USB IRQ in Cortex M3 core
-    NVIC_EnableIRQ(USB_LP_CAN1_RX0_IRQn);
-
-    // Force USB reset (CNTR_FRES = 1)
-    WRITE_REG(*CNTR, CNTR_FRES);
-
-    // Release USB reset (CNTR_FRES = 0)
-    WRITE_REG(*CNTR, 0);
-
-    // Add a short delay for USB hardware to stabilize
-    for (volatile int i = 0; i < 1000; i++);
-
-    // Wait until RESET flag is set
-    while (!READ_BIT(*ISTR, ISTR_RESET)) {
-        ;
-    }
-
-    // Clear pending interrupts
+    /* Step 4: Clear Pending Interrupts */
     WRITE_REG(*ISTR, 0);
 
-    // Clear CNTR register before setting the mask.
-    WRITE_REG(*CNTR, 0);
-
-    // Set interrupt mask
+    /* Step 5: Enable USB Peripheral (Exit Power Down) */
     WRITE_REG(*CNTR, CNTR_MASK);
 
+	/* Step 6: Enable USB Interrupts */
+    NVIC_EnableIRQ(USB_LP_CAN1_RX0_IRQn);
+
 }
+
 
 void USB_LP_CAN1_RX0_IRQHandler(void)
 {
