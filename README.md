@@ -107,8 +107,11 @@ Build : 3.210120.1702
 
 <img width="920" height="511" alt="image" src="https://github.com/user-attachments/assets/e8034086-d6f7-4c01-b520-119b45cc09f0" />
 
-This web standalone utility is an easy way to update your firmware if you are using the stm32-tkg-hid-bootloader.  It is very similar to the TKG-Flash utility.
+This web local/online utility is an easy way to update your firmware if you are using the stm32-tkg-hid-bootloader.  It is very similar to the TKG-Flash utility.
 You must use an Hid compatible browser. Your device must be in "bootloader" state.  You can then select or drop a file to flash your firmware.
+
+You can test it directly online here : https://thekikgen.github.io/tkg-hid-webcli.html
+
 
 # How to upgrade from your current bootoader
 
