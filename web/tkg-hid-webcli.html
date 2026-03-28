@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The KikGen Labs - HID Bootloader - Web firmware updater — Release 1.0</title>
+<style>
+:root{
+  --bg:#0b1020; --panel:#121936; --panel2:#0f1530; --text:#e8eefc; --muted:#9fb0d3;
+  --border:rgba(255,255,255,.10); --ok:#34d399; --warn:#f59e0b; --bad:#ef4444; --blue:#2563eb;
+  --shadow:0 16px 40px rgba(0,0,0,.24); --radius:14px;
+  font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; color:var(--text);
+  background:
+    radial-gradient(760px 320px at 0% -10%, rgba(37,99,235,.12), transparent 50%),
+    radial-gradient(620px 260px at 100% 0%, rgba(52,211,153,.08), transparent 44%),
+    var(--bg);
+}
+.wrap{max-width:920px; margin:0 auto; padding:18px}
+.header{display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px}
+.brand{display:flex; align-items:center; gap:10px}
+.logo{
+  width:38px; height:38px; border-radius:11px;
+  background:linear-gradient(135deg,#2563eb,#34d399);
+  display:grid; place-items:center; box-shadow:var(--shadow); font-weight:800; color:white; letter-spacing:.02em;
+}
+.title{font-size:20px; font-weight:750; line-height:1.08}
+.subtitle{font-size:12px; color:var(--muted); margin-top:2px}
+.kbd,.pill,.dropzoneName{
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  background:var(--panel2); border:1px solid var(--border); border-radius:9px; padding:6px 9px;
+}
+.version{font-size:12px}
+.card{
+  background:linear-gradient(180deg, rgba(255,255,255,.028), rgba(255,255,255,.018));
+  border:1px solid var(--border); border-radius:var(--radius); padding:13px; box-shadow:var(--shadow); margin-bottom:12px;
+}
+.row{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
+.grid{display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:8px}
+.grid4{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px}
+@media (max-width:860px){.grid,.grid4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:540px){.grid,.grid4{grid-template-columns:1fr}}
+.small{font-size:12px; color:var(--muted)}
+.fieldLabel{font-size:11px; color:var(--muted); margin-bottom:4px}
+button{
+  appearance:none; border:1px solid var(--border); background:#1a2147; color:#fff;
+  border-radius:10px; padding:9px 12px; cursor:pointer; font:inherit; font-size:14px;
+}
+button.primary{background:var(--blue)}
+button.danger{background:#b91c1c; border-color:#ef4444}
+button:disabled{opacity:.55; cursor:not-allowed}
+.progress{height:9px; background:var(--panel2); border-radius:999px; border:1px solid var(--border); overflow:hidden}
+.progress>div{height:100%; width:0%; background:var(--ok); transition:width .12s linear}
+.statusGood{color:var(--ok)} .statusWarn{color:var(--warn)} .statusBad{color:var(--bad)}
+.dropzone{border:1px dashed rgba(110,231,255,.30); border-radius:12px; padding:10px; transition:.12s border-color,.12s background}
+.dropzone.drag{border-color:#6ee7ff; background:rgba(110,231,255,.06)}
+.dropzoneName{flex:1; min-width:260px; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.notice{margin-top:7px; font-size:12px; min-height:16px}
+.notice.ok{color:var(--ok)} .notice.warn{color:var(--warn)} .notice.bad{color:var(--bad)}
+pre{
+  margin:8px 0 0 0; background:var(--panel2); border:1px solid var(--border); border-radius:11px;
+  padding:10px; max-height:220px; overflow:auto; white-space:pre-wrap; font:11px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+footer{margin-top:10px; text-align:center; color:var(--muted); font-size:11px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <div class="brand">
+      <div class="logo">KG</div>
+      <div>
+        <div class="title">The KikGen Labs - HID Bootloader - Web firmware updater</div>
+        <div class="subtitle">A client for the STM32F10x TKG-HID-BOOTLOADER</div>
+      </div>
+    </div>
+    <div class="kbd version">Release 1.0</div>
+  </div>
+
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+      <div class="row">
+        <div class="pill" id="scanStatus">Scanning</div>
+        <button id="authorizeBtn" class="primary" style="display:none">Authorize bootloader HID</button>
+      </div>
+      <label class="small"><input type="checkbox" id="expertToggle"> Expert</label>
+    </div>
+
+    <div class="grid" style="margin-top:12px">
+      <div><div class="fieldLabel">Bootloader version required</div><div class="kbd" id="ver">—</div></div>
+      <div><div class="fieldLabel">Device flash memory KB</div><div class="kbd" id="mem">—</div></div>
+      <div><div class="fieldLabel">Device page size</div><div class="kbd" id="page">—</div></div>
+      <div><div class="fieldLabel">Nb of page offset</div><div class="kbd" id="ofs">—</div></div>
+      <div><div class="fieldLabel">Base flash address</div><div class="kbd" id="base">—</div></div>
+    </div>
+  </div>
+
+  <div class="card dropzone" id="dropzone">
+    <input type="file" id="file" accept=".bin" style="display:none">
+    <div class="row">
+      <button id="filePickBtn">Select or drop a file</button>
+      <div class="dropzoneName" id="fname">—</div>
+    </div>
+
+    <div class="grid4" style="margin-top:12px">
+      <div><div class="fieldLabel">Firmware size</div><div class="kbd" id="fsize">—</div></div>
+      <div><div class="fieldLabel">MSP</div><div class="kbd" id="msp">—</div></div>
+      <div><div class="fieldLabel">Reset handler</div><div class="kbd" id="resetHandler">—</div></div>
+      <div><div class="fieldLabel">Estimated sectors</div><div class="kbd" id="sectors">—</div></div>
+    </div>
+
+    <div class="row" style="margin-top:14px">
+      <button id="flashBtn" class="danger" disabled>Flash</button>
+      <button id="cancelBtn" disabled>Cancel</button>
+    </div>
+
+    <div style="margin-top:14px">
+      <div class="progress"><div id="bar"></div></div>
+      <div id="doneMsg" class="notice ok" style="display:none">Firmware updated !</div>
+      <div id="rebootMsg" class="notice warn" style="display:none"></div>
+      <div id="validationMsg" class="notice" style="display:none"></div>
+    </div>
+
+    <div class="grid4" style="margin-top:12px">
+      <div><div class="fieldLabel">Checksum local</div><div class="kbd" id="cklocal">—</div></div>
+      <div><div class="fieldLabel">Checksum remote</div><div class="kbd" id="ckremote">—</div></div>
+      <div><div class="fieldLabel">Status</div><div class="kbd" id="ckstatus">—</div></div>
+      <div><div class="fieldLabel">Bootloader</div><div class="kbd" id="blState">—</div></div>
+    </div>
+  </div>
+
+  <div class="card" id="logCard" style="display:none">
+    <div class="row" style="justify-content:space-between">
+      <b>Expert log</b>
+      <button id="clearLogBtn">Clear</button>
+    </div>
+    <pre id="log"></pre>
+  </div>
+
+  <footer>The KikGen Labs · HID Bootloader Web Updater · Release 1.0</footer>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+const FW = {
+  VID: 0x1209,
+  PID: 0xBEBA,
+  PAYLOAD: 64,
+  CMD_START: 0,
+  CMD_END: 1,
+  CMD_ACK: 2,
+  CMD_INFO: 3,
+  SIGN: [0x42,0x54,0x4C,0x44,0x43,0x4D,0x44],
+  FLASH_BASE: 0x08000000
+};
+
+let hid = null;
+let fileBytes = null;
+let expert = false;
+let cancel = false;
+let rxQueue = [];
+let rxWaiters = [];
+let info = {
+  version: 0x0320,
+  versionHint: null,
+  protocolMode: null,
+  memKB: null,
+  pageSize: null,
+  pageOffset: null,
+  flashBase: null
+};
+
+function log(msg){
+  if(!expert) return;
+  const el = $("log");
+  el.textContent += msg + "\n";
+  el.scrollTop = el.scrollHeight;
+}
+
+function setScanStatus(text){
+  const el = $("scanStatus");
+  if(el) el.textContent = text;
+}
+function setAuthorizeVisible(v){
+  const el = $("authorizeBtn");
+  if(el) el.style.display = v ? "" : "none";
+}
+function setBootloaderState(t){ $("blState").textContent = t; }
+function setProgress(p){ $("bar").style.width = Math.max(0, Math.min(100, p|0)) + "%"; }
+function showNotice(id, text, cls){
+  const el = $(id);
+  el.textContent = text || "";
+  el.className = "notice " + (cls || "");
+  el.style.display = text ? "" : "none";
+}
+function resetNotices(){
+  showNotice("doneMsg", "", "ok");
+  showNotice("rebootMsg", "", "warn");
+  showNotice("validationMsg", "", "");
+}
+function setBootInfoUI(){
+  $("ver").textContent = "0x" + info.version.toString(16).toUpperCase().padStart(4, "0");
+    
+  $("mem").textContent = info.memKB ?? "—";
+  $("page").textContent = info.pageSize ?? "—";
+  $("ofs").textContent = info.pageOffset ?? "—";
+  $("base").textContent = info.flashBase !== null && info.flashBase !== undefined
+    ? "0x" + info.flashBase.toString(16).toUpperCase().padStart(8, "0")
+    : "—";
+}
+
+function isValidMsp(v){
+  return v >= 0x20000000 && v < 0x20020000;
+}
+function isValidResetHandler(v){
+  return v >= 0x08000000 && v < 0x08100000;
+}
+
+function updateFlashButtonState(){
+  const valid = $("validationMsg").dataset.valid === "1";
+  $("flashBtn").disabled = !(hid && fileBytes && valid);
+}
+
+function parseAndDisplayFirmwareMeta(bytes, fileName){
+  fileBytes = bytes;
+  $("fname").textContent = fileName || "—";
+  $("fsize").textContent = bytes.length + " bytes";
+  $("sectors").textContent = String(Math.ceil(bytes.length / 1024));
+
+  let valid = true;
+  let messages = [];
+
+  if(bytes.length >= 8){
+    const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const msp = dv.getUint32(0, true) >>> 0;
+    const reset = dv.getUint32(4, true) >>> 0;
+    $("msp").textContent = "0x" + msp.toString(16).toUpperCase().padStart(8, "0");
+    $("resetHandler").textContent = "0x" + reset.toString(16).toUpperCase().padStart(8, "0");
+
+    if(!isValidMsp(msp)){
+      valid = false;
+      messages.push("MSP outside STM32 RAM range.");
+    }
+    if(!isValidResetHandler(reset)){
+      valid = false;
+      messages.push("Reset handler outside STM32 flash range.");
+    }
+  } else {
+    $("msp").textContent = "—";
+    $("resetHandler").textContent = "—";
+    valid = false;
+    messages.push("Firmware file too short.");
+  }
+
+  $("validationMsg").dataset.valid = valid ? "1" : "0";
+  showNotice("validationMsg", messages.join(" "), valid ? "" : "bad");
+  updateFlashButtonState();
+}
+
+async function loadSelectedFile(file){
+  if(!file) return;
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  parseAndDisplayFirmwareMeta(bytes, file.name);
+}
+
+function pushRx(u8, reportId=0){
+  const frame = (reportId && reportId !== 0) ? new Uint8Array([reportId, ...u8]) : u8;
+  rxQueue.push(frame);
+  if(rxWaiters.length){
+    const w = rxWaiters.shift();
+    w();
+  }
+}
+function clearRx(){
+  rxQueue = [];
+  rxWaiters = [];
+}
+async function readRx(timeoutMs=10000){
+  const t0 = performance.now();
+  while(true){
+    if(rxQueue.length) return rxQueue.shift();
+    await new Promise(resolve => {
+      rxWaiters.push(resolve);
+      setTimeout(resolve, 50);
+    });
+    if(performance.now() - t0 > timeoutMs) throw new Error("Timeout RX");
+  }
+}
+async function waitForCmd(type, timeoutMs=10000){
+  const t0 = performance.now();
+  while(true){
+    const u8 = await readRx(Math.max(50, timeoutMs - (performance.now() - t0)));
+    const c7 = u8.length >= 8 ? u8[7] : null;
+    const c8 = u8.length >= 9 ? u8[8] : null;
+    if(c7 === type || c8 === type){
+      // Keep expert log concise: ACK frames are implied by "Block n/N OK".
+      if(type !== FW.CMD_ACK) log("RX cmd=" + type);
+      return u8;
+    }
+    if(performance.now() - t0 > timeoutMs){
+      throw new Error("Timeout waiting cmd " + type);
+    }
+  }
+}
+function makeCmd(cmd, data=0){
+  const p = new Uint8Array(FW.PAYLOAD);
+  p.set(FW.SIGN, 0);
+  p[7] = cmd & 0xFF;
+  p[8] = data & 0xFF;
+  return p;
+}
+async function sendPayload64(payload){
+  const attempts = [];
+  attempts.push({reportId:0, data:payload});
+  const payload65 = new Uint8Array(65);
+  payload65[0] = 0;
+  payload65.set(payload, 1);
+  attempts.push({reportId:0, data:payload65});
+
+  let lastErr = null;
+  for(const a of attempts){
+    try{
+      await hid.sendReport(a.reportId, a.data);
+      return;
+    }catch(err){
+      lastErr = err;
+    }
+  }
+  throw new Error(lastErr?.message || "Failed to write report.");
+}
+async function sendCmd(cmd, data=0){
+  log("CMD " + cmd);
+  await sendPayload64(makeCmd(cmd, data));
+}
+
+async function readInfo(){
+  clearRx();
+  const t0 = performance.now();
+  let reopened = false;
+
+  while(true){
+    await sendCmd(FW.CMD_INFO, 0);
+    try{
+      const raw = await waitForCmd(FW.CMD_INFO, 1000);
+      const u8 = (raw.length >= 9 && raw[8] === FW.CMD_INFO) ? raw.slice(1) : raw;
+      const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+
+      let layout = "modern";
+      info.version = 0x0320;
+      info.protocolMode = layout;
+      info.versionHint = info.version === null ? (layout === "modern" ? ">=0x0310 inferred" : "<0x0310 inferred") : null;
+      info.memKB = dv.getUint16(0, true);
+      info.pageSize = (info.memKB > 128 ? 2048 : 1024);
+      info.pageOffset = u8[2];
+      info.flashBase = (FW.FLASH_BASE + info.pageOffset * info.pageSize) >>> 0;
+
+      setBootInfoUI();
+      log("INFO OK");
+      return;
+    }catch(e){
+      if(!reopened && hid){
+        reopened = true;
+        log("Re-sync");
+        try{ if(hid.opened) await hid.close(); }catch(err){}
+        await hid.open();
+        clearRx();
+      }
+    }
+    if(performance.now() - t0 > 12000){
+      throw new Error("INFO timeout");
+    }
+  }
+}
+
+async function openHidDevice(device, skipReadInfo=false){
+  if(hid && hid === device && hid.opened){
+    setScanStatus("Connected");
+    setAuthorizeVisible(false);
+    updateFlashButtonState();
+    if(!skipReadInfo) await readInfo();
+    return;
+  }
+
+  hid = device;
+  if(!hid.opened) await hid.open();
+
+  if(!hid.__tkglListenerAttached){
+    hid.addEventListener("inputreport", ev => {
+      const a = new Uint8Array(ev.data.buffer.slice(ev.data.byteOffset, ev.data.byteOffset + ev.data.byteLength));
+      pushRx(a, ev.reportId ?? 0);
+    });
+    hid.__tkglListenerAttached = true;
+  }
+
+  info.version = (typeof hid.version === "number") ? hid.version : null;
+  setScanStatus("Connected");
+  setAuthorizeVisible(false);
+  setBootloaderState("ready");
+  log("Connected");
+  updateFlashButtonState();
+  if(!skipReadInfo) await readInfo();
+}
+
+async function disconnect(){
+  if(hid){
+    try{ if(hid.opened) await hid.close(); }catch(e){}
+  }
+  hid = null;
+  setScanStatus("Disconnected");
+  setAuthorizeVisible(true);
+  setBootloaderState("missing");
+  updateFlashButtonState();
+}
+
+async function authorizeDevice(){
+  if(!window.isSecureContext){
+    alert("WebHID requires HTTPS or localhost.");
+    return;
+  }
+  if(!navigator.hid){
+    alert("WebHID not supported.");
+    return;
+  }
+  setScanStatus("Scanning");
+  const list = await navigator.hid.requestDevice({filters:[{vendorId:FW.VID, productId:FW.PID}]});
+  if(!list.length){
+    setScanStatus("Disconnected");
+    setAuthorizeVisible(true);
+    return;
+  }
+  const dev = list.find(d => (d.productName || "").includes("TKGL BTL")) || list[0];
+  await openHidDevice(dev);
+}
+
+async function pollForBootloader(){
+  if(!window.isSecureContext || !navigator.hid){
+    setScanStatus("Disconnected");
+    setAuthorizeVisible(true);
+    return;
+  }
+  try{
+    setScanStatus(hid ? "Connected" : "Scanning");
+    const devices = await navigator.hid.getDevices();
+    const dev = devices.find(d => (d.productName || "").includes("TKGL BTL"));
+
+    if(dev){
+      if(!hid || hid !== dev || !hid.opened){
+        await openHidDevice(dev);
+      } else {
+        setScanStatus("Connected");
+        setAuthorizeVisible(false);
+      }
+    } else {
+      if(hid) await disconnect();
+      else {
+        setScanStatus("Disconnected");
+        setAuthorizeVisible(true);
+      }
+    }
+  }catch(e){
+    setScanStatus("Disconnected");
+    setAuthorizeVisible(true);
+    log("Polling error");
+  }
+}
+
+async function waitForBootloaderDisappear(timeoutMs=8000){
+  const t0 = performance.now();
+  while(performance.now() - t0 < timeoutMs){
+    const devices = await navigator.hid.getDevices();
+    const dev = devices.find(d => (d.productName || "").includes("TKGL BTL"));
+    if(!dev){
+      await disconnect();
+      return true;
+    }
+    await new Promise(r => setTimeout(r, 250));
+  }
+  return false;
+}
+
+async function flashFirmware(){
+  if(!hid || !fileBytes) return;
+  if($("validationMsg").dataset.valid !== "1"){
+    throw new Error("Invalid firmware file.");
+  }
+
+  cancel = false;
+  resetNotices();
+  $("cklocal").textContent = "—";
+  $("ckremote").textContent = "—";
+  $("ckstatus").textContent = "running";
+  $("cancelBtn").disabled = false;
+  $("flashBtn").disabled = true;
+  setProgress(0);
+  setBootloaderState("flashing");
+
+  await readInfo();
+
+  await sendCmd(FW.CMD_START, 0);
+  await waitForCmd(FW.CMD_ACK, 8000);
+  log("START ACK");
+ 
+  let cks = 0;
+  const totalBlocks = Math.ceil(fileBytes.length / 1024);
+
+  for(let blk=0; blk<totalBlocks; blk++){
+    if(cancel) throw new Error("Cancelled");
+    const off = blk * 1024;
+    const block = new Uint8Array(1024);
+    block.set(fileBytes.slice(off, Math.min(off + 1024, fileBytes.length)), 0);
+
+    for(let i=0; i<1024; i+=64){
+      if(cancel) throw new Error("Cancelled");
+      const payload = block.slice(i, i+64);
+      for(const b of payload) cks ^= b;
+      await sendPayload64(payload);
+      await new Promise(r => setTimeout(r, 1));
+    }
+
+    await waitForCmd(FW.CMD_ACK, 1000);
+
+    log(`Block ${blk+1}/${totalBlocks} OK`);
+    setProgress(Math.floor(((blk+1)/totalBlocks) * 100));
+  }
+
+  const local = cks & 0xFF;
+  $("cklocal").textContent = "0x" + local.toString(16).toUpperCase().padStart(2, "0");
+
+  await sendCmd(FW.CMD_END, 0);
+
+  const rawEnd = await waitForCmd(FW.CMD_END, 10000);
+  const end = (rawEnd.length >= 9 && rawEnd[8] === FW.CMD_END) ? rawEnd.slice(1) : rawEnd;
+  const remote = end[0] & 0xFF;
+  $("ckremote").textContent = "0x" + remote.toString(16).toUpperCase().padStart(2, "0");
+  if(remote === local){
+    $("ckstatus").textContent = "OK";
+    log("Checksum OK");
+  } else {
+      $("ckstatus").textContent = "Mismatch";
+  }
+ 
+  setProgress(100);
+  showNotice("doneMsg", "Firmware updated !", "ok");
+  setBootloaderState("waiting reboot");
+
+  const disappeared = await waitForBootloaderDisappear(8000);
+  if(disappeared){
+    log("Bootloader disconnected");
+    showNotice("rebootMsg", "Bootloader disconnected", "warn");
+    await new Promise(r => setTimeout(r, 800));
+    showNotice("rebootMsg", "Device rebooting...", "warn");
+    log("Device rebooting...");
+  }
+
+  $("cancelBtn").disabled = true;
+  updateFlashButtonState();
+}
+
+$("authorizeBtn").onclick = async () => {
+  try{
+    await authorizeDevice();
+  }catch(e){
+    alert(e.message || String(e));
+  }
+};
+
+$("expertToggle").onchange = e => {
+  expert = e.target.checked;
+  $("logCard").style.display = expert ? "" : "none";
+};
+$("clearLogBtn").onclick = () => { $("log").textContent = ""; };
+
+$("file").onchange = async e => {
+  const f = e.target.files?.[0];
+  if(!f) return;
+  await loadSelectedFile(f);
+};
+$("filePickBtn").onclick = () => $("file").click();
+
+const dropzone = $("dropzone");
+["dragenter","dragover"].forEach(evt => {
+  document.addEventListener(evt, e => {
+    e.preventDefault();
+    dropzone.classList.add("drag");
+  });
+});
+["dragleave","drop"].forEach(evt => {
+  document.addEventListener(evt, e => {
+    e.preventDefault();
+    if(evt === "drop") dropzone.classList.remove("drag");
+  });
+});
+document.addEventListener("drop", async e => {
+  dropzone.classList.remove("drag");
+  const f = e.dataTransfer?.files?.[0];
+  if(!f) return;
+  await loadSelectedFile(f);
+});
+
+$("flashBtn").onclick = async () => {
+  try{
+    await flashFirmware();
+  }catch(e){
+    $("ckstatus").textContent = "error";
+    showNotice("validationMsg", "Flash error: " + (e.message || e), "bad");
+    log("ERR " + (e.message || e));
+  } finally {
+    $("cancelBtn").disabled = true;
+    updateFlashButtonState();
+  }
+};
+$("cancelBtn").onclick = () => { cancel = true; log("Cancel requested"); };
+
+setBootInfoUI();
+setBootloaderState("idle");
+setScanStatus("Scanning");
+setAuthorizeVisible(false);
+navigator.hid?.addEventListener?.("connect", async (e) => {
+  if((e.device?.productName || "").includes("TKGL BTL")){
+    try{ await pollForBootloader(); }catch(err){}
+  }
+});
+navigator.hid?.addEventListener?.("disconnect", async (e) => {
+  if(hid && e.device === hid){
+    await disconnect();
+  }
+});
+pollForBootloader();
+setInterval(pollForBootloader, 2000);
+</script>
+</body>
+</html>
