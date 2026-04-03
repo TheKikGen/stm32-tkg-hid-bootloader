@@ -26,13 +26,19 @@ void FLASH_WritePage(uint16_t *page, uint16_t *data, uint16_t size)
 {
 	FLASH_WAIT_COMPLETE;
 
-	// Unlock Flash with magic keys
-	// If already unlocked, do nothing
+	// Clear any pending error/status flags before starting (matches CubeProgrammer
+	// behaviour — required on clone chips that leave PGERR set after failed ops)
+	WRITE_REG(FLASH->SR, FLASH_SR_PGERR | FLASH_SR_WRPRTERR | FLASH_SR_EOP);
 
-	if ( READ_BIT(FLASH->CR, FLASH_CR_LOCK) ) {
-		WRITE_REG(FLASH->KEYR, FLASH_KEY1);
-		WRITE_REG(FLASH->KEYR, FLASH_KEY2);
-	}
+	// Unlock Flash unconditionally.  On certain clone chips FLASH_CR.LOCK reads
+	// as 0 after reset even though the flash controller is still locked in
+	// hardware until the correct key sequence is written to FLASH_KEYR.
+	// The conditional check caused the unlock to be skipped on those devices,
+	// making every subsequent erase/write silently do nothing.
+	// Writing the correct keys when already unlocked is a safe no-op on
+	// genuine STM32F1 silicon (CubeProgrammer does the same thing).
+	WRITE_REG(FLASH->KEYR, FLASH_KEY1);
+	WRITE_REG(FLASH->KEYR, FLASH_KEY2);
 
 	FLASH_WAIT_COMPLETE;
 
